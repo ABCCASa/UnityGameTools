@@ -16,13 +16,13 @@ namespace GameTools.FiniteStateMachine
 
         public void Tick()
         {
-            if (!isActive) { OnEnter(); }
+            if (!isActive) OnEnter();
             OnUpdate();
         }
       
         public void Exit()
         {
-            if (!isActive) { return; }
+            if (!isActive) return;
             OnExit();
         }
         public int Trigger<T>(T eventName)
