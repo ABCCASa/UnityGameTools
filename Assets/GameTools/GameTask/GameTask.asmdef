@@ -1,0 +1,16 @@
+{
+    "name": "GameTask",
+    "rootNamespace": "",
+    "references": [
+        "GUID:f1121d2ec3155234188c6db1216740cb"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
