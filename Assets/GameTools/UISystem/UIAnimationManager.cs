@@ -50,8 +50,6 @@ namespace GameTools.UISystem
             return index >= 0;
         }
 
-
-
         public void SpeedUpAnimation(object reference, float fadeTime)
         {
             int index = controllers.FindIndex(x => x.reference == reference);

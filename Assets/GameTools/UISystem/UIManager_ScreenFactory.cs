@@ -70,8 +70,5 @@ namespace GameTools.UISystem
             var pool = GetPool(screen.GetType());
             pool.Release(screen);            
         }
-        
-        
-        
     }
 }

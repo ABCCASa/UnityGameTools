@@ -14,7 +14,7 @@ namespace GameTools.UISystem
         public override TScreen Open<TScreen, TParam>(TParam param, float fadeTime = -1) => Push<TScreen, TParam>(param, fadeTime);
         private ScreenBase Peek(ScreenState state) => screenStack.FindLast(s => s.state == state);
 
-        public T Push<T>(float fadeTime) where T : Screen
+        public T Push<T>(float fadeTime=-1) where T : Screen
         {
             if (!isActive) throw new Exception("未active的情况下无法添加");
             if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
@@ -30,7 +30,7 @@ namespace GameTools.UISystem
             return screen;
         }
 
-        public TScreen Push<TScreen, TParam>(TParam param, float fadeTime) where TScreen : Screen<TParam>
+        public TScreen Push<TScreen, TParam>(TParam param, float fadeTime=-1) where TScreen : Screen<TParam>
         {
             if (!isActive) throw new Exception("未active的情况下无法添加");
             if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
@@ -50,21 +50,31 @@ namespace GameTools.UISystem
         {
             if (!isActive) throw new Exception("未active的情况下无法Pop");
             if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
-            isBusy = true;
-            ScreenBase closeScreen = Peek(ScreenState.Open);
-            if (closeScreen == null) return;
-            closeScreen.SetClose(fadeTime, () =>
+            try
             {
-                screenStack.Remove(closeScreen);
-                UIManager.ReleaseScreen(closeScreen);
-                UIManager.UpdateInteractable();
-            });
-            ScreenBase resumeScreen = Peek(ScreenState.Pause);
-            if (resumeScreen == null) return;
-            resumeScreen.SetResume(fadeTime);
-            UIManager.UpdateInteractable();
-            isBusy = false;
+                using (UIManager.DelayStateUpdateScope())
+                {
+                    isBusy = true;
+                    ScreenBase closeScreen = Peek(ScreenState.Open);
+                    if (closeScreen == null) return;
+                    closeScreen.SetClose(fadeTime, () =>
+                    {
+                        screenStack.Remove(closeScreen);
+                        UIManager.ReleaseScreen(closeScreen);
+                        UIManager.UpdateInteractable();
+                    });
+                    ScreenBase resumeScreen = Peek(ScreenState.Pause);
+                    if (resumeScreen == null) return;
+                    resumeScreen.SetResume(fadeTime);
+                    UIManager.UpdateInteractable();
+                }
+            }
+            finally
+            {
+                isBusy = false;
+            }
         }
+        
         public override void Close(ScreenBase screen, float fadeTime = -1)
         {
             if (!screenStack.Contains(screen)) throw new Exception($"{screen} is not include in this Group");
@@ -84,20 +94,25 @@ namespace GameTools.UISystem
                 isBusy = false;
             }
         }
-
-        private protected override void OnResume()
+        
+        public void SpeedUpAnimations(float fadeTime)
         {
-            if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
-            if (screenStack.Count == 0) return;
-            isBusy = true;
-            ScreenBase screen = Peek(ScreenState.Pause);
-            if (screen == null) return;
-            screen.SetResume();
-            UIManager.UpdateOrder();
-            UIManager.UpdateInteractable();
-            isBusy = false;
+            for (int i = screenStack.Count - 1; i >= 0; i--)
+            {
+                var screen = screenStack[i];
+                if (screen.isFade) screen.SpeedUpAnimation(fadeTime);
+            }
         }
-
+        
+        public void CompleteAnimations()
+        {
+            for (int i = screenStack.Count - 1; i >= 0; i--)
+            {
+                var screen = screenStack[i];
+                if (screen.isFade) screen.CompleteAnimation();
+            }
+        }
+        
         private protected override void OnPause()
         {
             if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
@@ -105,19 +120,27 @@ namespace GameTools.UISystem
             using (UIManager.DelayStateUpdateScope())
             {
                 isBusy = true;
-                // 清理退出一半的Screen
-                for (int i = screenStack.Count - 1; i >= 0; i--)
-                {
-                    var screen = screenStack[i];
-                    if (screen.state != ScreenState.Close) continue;
-                    if (screen.isFade) screen.CompleteAnimation();
-                    else throw new ArgumentException("List中出现完全关闭的Screen"); // 额外的保护，只要内部逻辑正常就不会触发
-                }
                 Peek(ScreenState.Open)?.SetPause();
+                CompleteAnimations(); // 清理退出一半的Screen
                 UIManager.UpdateOrder();
                 UIManager.UpdateInteractable();
                 isBusy = false;
             }
+        }
+
+        private protected override void OnResume()
+        {
+            if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
+            if (screenStack.Count == 0) return;
+            isBusy = true;
+            ScreenBase screen = Peek(ScreenState.Pause);
+            if (screen != null)
+            {
+                screen.SetResume();
+                UIManager.UpdateOrder();
+                UIManager.UpdateInteractable();
+            }
+            isBusy = false;
         }
 
         public override void CloseAll()

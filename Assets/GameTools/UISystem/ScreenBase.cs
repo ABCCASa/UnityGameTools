@@ -40,7 +40,7 @@ namespace GameTools.UISystem
             }
         }
         
-        public ScreenState state { get; protected set; } = ScreenState.Close;
+        public ScreenState state { get; private set; } = ScreenState.Close;
         public bool isFade { get; private protected set; } = false;
         public abstract bool blockInput { get; }
         public virtual bool enableAutoBind {get;} = true;
@@ -113,7 +113,6 @@ namespace GameTools.UISystem
             });
         }
 
-
         internal void SetClose(float fadeTime = -1, Action callback = null)
         {
             if (state == ScreenState.Close) throw new InvalidOperationException("cannot close screen when state is close");
@@ -129,7 +128,6 @@ namespace GameTools.UISystem
             {
                 isFade = false;
                 gameObject.SetActive(false);
-                UIManager.ReleaseScreen(this);
                 callback?.Invoke();
             });
         }
@@ -151,12 +149,10 @@ namespace GameTools.UISystem
             });
         }
         
-
         protected virtual void OpenCloseAnimation(float progress)
         {
             canvasGroup.alpha = progress;
         }
-
 
         protected virtual void ResumePauseAnimation(float progress)
         {
@@ -175,7 +171,6 @@ namespace GameTools.UISystem
 
         
         #region 访问Container
-
         public T OpenScreen<T>(float fadeTime) where T : Screen
         {
             if (registeredGroup != null && registeredGroup.isActive)
@@ -201,8 +196,6 @@ namespace GameTools.UISystem
 
         #endregion
 
-        
-      
         #region 绑定系统
         protected T Find<T>(string path = null) where T : Component
         {

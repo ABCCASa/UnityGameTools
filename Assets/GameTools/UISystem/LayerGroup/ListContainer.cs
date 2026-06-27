@@ -26,7 +26,7 @@ namespace GameTools.UISystem
             isBusy = true;
             var screen = UIManager.GetScreen<T>();
             if (addAbove) screenList.Add(screen);
-            else  screenList.Insert(0, screen);
+            else screenList.Insert(0, screen);
             screen.SetOpen(fadeTime, this);
             UIManager.UpdateInteractable();
             UIManager.UpdateOrder();
@@ -53,9 +53,10 @@ namespace GameTools.UISystem
         {
             if (!isActive) throw new Exception("未active的情况下无法添加");
             if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
+            if (relative.state != ScreenState.Open) throw new Exception($"{relative} is not open");
             int index = screenList.IndexOf(relative);
             if(index<0) throw new Exception($"{relative} is not include in this Group");
-            if (relative.state != ScreenState.Open) throw new Exception($"{relative} is not open");
+          
             isBusy = true;
             var screen = UIManager.GetScreen<T>();
             screenList.Insert(addAbove ? index + 1 : index, screen);
@@ -66,13 +67,14 @@ namespace GameTools.UISystem
             return screen;
         } 
         
-        public TScreen Open<TScreen, TParam>(TParam param,ScreenBase relative, float fadeTime = -1, bool addAbove = true) where TScreen : Screen<TParam>
+        public TScreen Open<TScreen, TParam>(ScreenBase relative, TParam param, float fadeTime = -1, bool addAbove = true) where TScreen : Screen<TParam>
         {
             if (!isActive) throw new Exception("未active的情况下无法添加");
             if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
+            if (relative.state != ScreenState.Open) throw new Exception($"{relative} is not open");
             int index = screenList.IndexOf(relative);
             if(index<0) throw new Exception($"{relative} is not include in this Group");
-            if (relative.state != ScreenState.Open) throw new Exception($"{relative} is not open");
+          
             isBusy = true;
             var screen = UIManager.GetScreen<TScreen>();
             screenList.Insert(addAbove ? index + 1 : index, screen);
@@ -107,9 +109,9 @@ namespace GameTools.UISystem
                 foreach (ScreenBase screen in screenList)
                 {
                     screen.SetResume();
-                    UIManager.UpdateOrder();
-                    UIManager.UpdateInteractable();
                 }
+                UIManager.UpdateOrder();
+                UIManager.UpdateInteractable();
                 isBusy = false;
             });
         }
