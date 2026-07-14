@@ -3,6 +3,7 @@ using GameTools.PlayerLoopManagement;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using UnityEngine.Assertions;
 using UnityEngine.PlayerLoop;
 
 
@@ -13,11 +14,9 @@ namespace GameTools.GameTask
         internal AsyncLoop() { }
         private Queue<Action> nextQueue = new Queue<Action>(128);
         private Queue<Action> currentQueue = new Queue<Action>(128);
-        
         protected void BeforeAction()
         {
-            // Swap Queues
-            (currentQueue, nextQueue) = (nextQueue, currentQueue);
+            (currentQueue, nextQueue) = (nextQueue, currentQueue); // Swap Queues
         }
 
         protected void AfterAction()
@@ -29,16 +28,11 @@ namespace GameTools.GameTask
             }
         }
 
-        private void Enqueue(Action continuation)
-        {
-            nextQueue.Enqueue(continuation);
-        }
-
         public IAwaiter GetAwaiter() => this;
         bool IAwaiter.IsCompleted => false;
         void IAwaiter.GetResult() {}
-        void ICriticalNotifyCompletion.UnsafeOnCompleted(Action continuation) => Enqueue(continuation);
-        void INotifyCompletion.OnCompleted(Action continuation) => Enqueue(continuation);
+        void ICriticalNotifyCompletion.UnsafeOnCompleted(Action continuation) => nextQueue.Enqueue(continuation);
+        void INotifyCompletion.OnCompleted(Action continuation) => nextQueue.Enqueue(continuation);
 
         internal void Clear()
         {
@@ -55,20 +49,19 @@ namespace GameTools.GameTask
         {
             if (PlayerLoopManager.Exist<Before>() || PlayerLoopManager.Exist<After>())
             {
-                throw new InvalidOperationException("playerloop 重复添加");
+                throw new InvalidOperationException("player loop 重复添加");
             }
-
             if (!PlayerLoopManager.InsertAdjacentTo<Before, TLoop>(BeforeAction, false))
             {
                 throw new InvalidOperationException($"Failed to insert before {typeof(TLoop).Name}");
             }
-
             if (!PlayerLoopManager.InsertAdjacentTo<After, TLoop>(AfterAction, true))
             {
                 throw new InvalidOperationException($"Failed to insert after {typeof(TLoop).Name}");
             }
         }
     }
+
 
     internal static class GameTaskLoopScheduler
     {

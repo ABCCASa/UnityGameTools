@@ -3,58 +3,49 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Assertions;
 
-
 namespace GameTools.UISystem
 {
     public class StackContainer : ContainerBase
     {
         private List<ScreenBase> screenStack = new();
-        public bool isBusy { get; private set; } = false;
+        public override int count => screenStack.Count;
         public override T Open<T>(float fadeTime = -1) => Push<T>(fadeTime);
         public override TScreen Open<TScreen, TParam>(TParam param, float fadeTime = -1) => Push<TScreen, TParam>(param, fadeTime);
         private ScreenBase Peek(ScreenState state) => screenStack.FindLast(s => s.state == state);
 
-        public T Push<T>(float fadeTime=-1) where T : Screen
+        public TScreen Push<TScreen>(float fadeTime = -1) where TScreen : Screen
         {
-            if (!isActive) throw new Exception("未active的情况下无法添加");
-            if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
-            isBusy = true;
-            ScreenBase pauseScreen = Peek(ScreenState.Open);
-            pauseScreen?.SetPause(fadeTime, UIManager.UpdateInteractable);
-            var screen = UIManager.GetScreen<T>();
-            screenStack.Add(screen);
-            screen.SetOpen(fadeTime, this);
-            UIManager.UpdateOrder();
-            UIManager.UpdateInteractable();
-            isBusy = false;
-            return screen;
+            return PushBase<TScreen>(screen => screen.SetOpen(fadeTime, this), fadeTime);
         }
 
-        public TScreen Push<TScreen, TParam>(TParam param, float fadeTime=-1) where TScreen : Screen<TParam>
+        public TScreen Push<TScreen, TParam>(TParam param, float fadeTime = -1) where TScreen : Screen<TParam>
+        {
+           return PushBase<TScreen>(screen => screen.SetOpen(param, fadeTime, this), fadeTime);
+        }
+
+        private TScreen PushBase<TScreen>(Action<TScreen> onOpen,float fadeTime = -1) where TScreen : ScreenBase
         {
             if (!isActive) throw new Exception("未active的情况下无法添加");
-            if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
-            isBusy = true;
-            ScreenBase pauseScreen = Peek(ScreenState.Open);
-            pauseScreen?.SetPause(fadeTime, UIManager.UpdateInteractable);
-            var screen = UIManager.GetScreen<TScreen>();
-            screenStack.Add(screen);
-            screen.SetOpen(param, fadeTime, this);
-            UIManager.UpdateOrder();
-            UIManager.UpdateInteractable();
-            isBusy = false;
-            return screen;
+            using (GetBusyScope())
+            {
+                ScreenBase pauseScreen = Peek(ScreenState.Open);
+                pauseScreen?.SetPause(fadeTime, UIManager.UpdateInteractable);
+                var screen = UIManager.GetScreen<TScreen>();
+                screenStack.Add(screen);
+                onOpen.Invoke(screen);
+                UIManager.UpdateOrder();
+                UIManager.UpdateInteractable();
+                return screen;
+            }
         }
 
         public void Pop(float fadeTime)
         {
             if (!isActive) throw new Exception("未active的情况下无法Pop");
-            if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
-            try
+            using (GetBusyScope())
             {
-                using (UIManager.DelayStateUpdateScope())
+                using (UIManager.GetDelayScope())
                 {
-                    isBusy = true;
                     ScreenBase closeScreen = Peek(ScreenState.Open);
                     if (closeScreen == null) return;
                     closeScreen.SetClose(fadeTime, () =>
@@ -69,32 +60,28 @@ namespace GameTools.UISystem
                     UIManager.UpdateInteractable();
                 }
             }
-            finally
-            {
-                isBusy = false;
-            }
         }
-        
+
         public override void Close(ScreenBase screen, float fadeTime = -1)
         {
             if (!screenStack.Contains(screen)) throw new Exception($"{screen} is not include in this Group");
             if (screen.state == ScreenState.Open)
             {
-                Assert.IsTrue(screen==Peek(ScreenState.Open), "出现错误，screenStack出现两个打开的screen"); // 进一步确认pop移除的就是指定的screen
+                Assert.IsTrue(screen == Peek(ScreenState.Open), "出现错误，screenStack出现两个打开的screen"); // 确认pop移除的就是指定的screen
                 Pop(fadeTime);
             }
             else // 移除暂停状态的Screen
             {
-                if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
-                isBusy = true;
-                Debug.LogWarning($"正在关闭非顶层打开的 Screen: {screen}");
-                screen.SetClose(-1, () => { UIManager.ReleaseScreen(screen); });
-                screenStack.Remove(screen);
-                UIManager.UpdateInteractable();
-                isBusy = false;
+                using (GetBusyScope())
+                {
+                    Debug.LogWarning($"正在关闭非顶层打开的 Screen: {screen}");
+                    screen.SetClose(-1, () => { UIManager.ReleaseScreen(screen); });
+                    screenStack.Remove(screen);
+                    UIManager.UpdateInteractable();
+                }
             }
         }
-        
+
         public void SpeedUpAnimations(float fadeTime)
         {
             for (int i = screenStack.Count - 1; i >= 0; i--)
@@ -103,7 +90,7 @@ namespace GameTools.UISystem
                 if (screen.isFade) screen.SpeedUpAnimation(fadeTime);
             }
         }
-        
+
         public void CompleteAnimations()
         {
             for (int i = screenStack.Count - 1; i >= 0; i--)
@@ -112,71 +99,68 @@ namespace GameTools.UISystem
                 if (screen.isFade) screen.CompleteAnimation();
             }
         }
-        
+
         private protected override void OnPause()
         {
-            if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
-            if (screenStack.Count == 0) return;
-            using (UIManager.DelayStateUpdateScope())
+            using (GetBusyScope())
             {
-                isBusy = true;
-                Peek(ScreenState.Open)?.SetPause();
-                CompleteAnimations(); // 清理退出一半的Screen
-                UIManager.UpdateOrder();
-                UIManager.UpdateInteractable();
-                isBusy = false;
+                if (screenStack.Count == 0) return;
+                using (UIManager.GetDelayScope())
+                {
+                    Peek(ScreenState.Open)?.SetPause();
+                    CompleteAnimations(); // 清理退出一半的Screen
+                    UIManager.UpdateOrder();
+                    UIManager.UpdateInteractable();
+                }
             }
         }
 
         private protected override void OnResume()
         {
-            if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
-            if (screenStack.Count == 0) return;
-            isBusy = true;
-            ScreenBase screen = Peek(ScreenState.Pause);
-            if (screen != null)
+            using (GetBusyScope())
             {
+                if (screenStack.Count == 0) return;
+                ScreenBase screen = Peek(ScreenState.Pause);
+                if (screen == null) return;
                 screen.SetResume();
                 UIManager.UpdateOrder();
                 UIManager.UpdateInteractable();
             }
-            isBusy = false;
         }
 
         public override void CloseAll()
         {
-            if (isBusy) throw new Exception("不要在screen生命周期内修改自身所属的LayerGroup的状态");
-            if (screenStack.Count == 0) return;
-            using (UIManager.DelayStateUpdateScope())
+            using (GetBusyScope())
             {
-                isBusy = true;
-                for (int i = screenStack.Count - 1; i >= 0; i--)
-                {  
-                    var screen =screenStack[i];
-                    if (screen.state == ScreenState.Close)
+                if (screenStack.Count == 0) return;
+                using (UIManager.GetDelayScope())
+                {
+                    for (int i = screenStack.Count - 1; i >= 0; i--)
                     {
-                        if (screen.isFade) screen.CompleteAnimation(); // 回调中自带移除
-                        else throw new ArgumentException("List中出现完全关闭的Screen");
+                        var screen = screenStack[i];
+                        if (screen.state == ScreenState.Close)
+                        {
+                            if (screen.isFade) screen.CompleteAnimation(); // 回调中自带移除
+                            else throw new ArgumentException("List中出现完全关闭的Screen");
+                        }
+                        else
+                        {
+                            screen.SetClose(-1, () => { UIManager.ReleaseScreen(screen); });
+                            screenStack.Remove(screen);
+                        }
                     }
-                    else
-                    {
-                        screen.SetClose(-1, () => { UIManager.ReleaseScreen(screen); });
-                        screenStack.Remove(screen);
-                    }
+                    Assert.IsTrue(screenStack.Count == 0);
+                    if (isActive) UIManager.UpdateInteractable();
                 }
-                if (screenStack.Count != 0) Debug.LogError("出现意外，Clear未完成清除任务");
-                if (isActive) UIManager.UpdateInteractable();
-                isBusy = false;
             }
         }
 
         internal override void UpdateOrder(ref int order)
         {
             if (!isActive) return;
-            foreach (ILayerItem screen in screenStack)
+            foreach (IContainerItem screen in screenStack)
             {
-                screen.SetOrder(order);
-                order++;
+                screen.SetOrder(ref order);
             }
         }
 
@@ -185,11 +169,8 @@ namespace GameTools.UISystem
             if (!isActive) return;
             for (int i = screenStack.Count - 1; i >= 0; i--)
             {
-                ScreenBase screen = screenStack[i];
-                if (screen.state != ScreenState.Open && !screen.isFade) continue;
-                ILayerItem item = screen;
-                item.SetInteractable(interactable);
-                if (item.blockInput) interactable = false;
+                IContainerItem item = screenStack[i];
+                item.SetInteractable(ref interactable);
             }
         }
     }

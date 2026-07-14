@@ -8,57 +8,56 @@ using UnityEngine.UI;
 
 namespace GameTools.UISystem
 {
+    public enum ScreenAnimType { Open, Pause, Resume, Close }
     public enum ScreenState { Open, Close, Pause }
-    
-    [RequireComponent(typeof(Canvas))] [RequireComponent(typeof(CanvasGroup))]
-    public abstract class ScreenBase: MonoBehaviour, ILayerItem
+
+    [RequireComponent(typeof(Canvas), typeof(CanvasGroup))]
+    public abstract class ScreenBase : MonoBehaviour, IContainerItem
     {
         internal ScreenBase() { }
         [SerializeField] private Canvas canvas;
         [SerializeField] private CanvasGroup canvasGroup;
-        private ContainerBase registeredGroup;
+        private ContainerBase container;
+        
+
         private bool _globalInteractable, _selfInteractable;
-       
         private bool globalInteractable
         {
-            get => _globalInteractable;
-            set 
+            set
             {
-            _globalInteractable = value;
-            canvasGroup.interactable = _globalInteractable && _selfInteractable;
+                _globalInteractable = value;
+                canvasGroup.interactable = _globalInteractable && _selfInteractable;
             }
         }
 
-                
-        private protected bool selfInteractable 
+        private protected bool selfInteractable
         {
-            get => _selfInteractable;
             set
             {
                 _selfInteractable = value;
                 canvasGroup.interactable = _globalInteractable && _selfInteractable;
             }
         }
-        
+
         public ScreenState state { get; private set; } = ScreenState.Close;
-        public bool isFade { get; private protected set; } = false;
+        public bool isFade { get; private set; }
         public abstract bool blockInput { get; }
-        public virtual bool enableAutoBind {get;} = true;
-        
+        public virtual bool enableAutoBind => true;
+
         protected virtual void OnInit() { }
-        protected virtual void OnClose() { }
-        protected virtual void OnPause(){ }
+        protected virtual void OnClose(ScreenState previousState) { }
+        protected virtual void OnPause() { }
         protected virtual void OnResume() { }
         protected virtual void OnDispose() { }
 
         public void CompleteAnimation()
         {
-          if(isFade) UIAnimationManager.Instance.CompleteAnimation(this);
+            if (isFade) UIAnimationManager.Instance.CompleteAnimation(this);
         }
 
         public void SpeedUpAnimation(float fadeTime)
         {
-            if(isFade) UIAnimationManager.Instance.SpeedUpAnimation(this, fadeTime);
+            if (isFade) UIAnimationManager.Instance.SpeedUpAnimation(this, fadeTime);
         }
 
         internal void SetInit()
@@ -80,15 +79,16 @@ namespace GameTools.UISystem
         }
 
         internal void SetPause(float fadeTime = -1, Action callback = null)
-        { 
-            if(state!=ScreenState.Open) throw new InvalidOperationException("cannot pause screen when state is not open");
+        {
+            if (state != ScreenState.Open) throw new InvalidOperationException("cannot pause screen when state is not open");
             CompleteAnimation();
             state = ScreenState.Pause;
             selfInteractable = false;
             SafeCall(OnPause);
             isFade = true;
-            OpenCloseAnimation(1);
-            UIAnimationManager.Instance.SetAnimation(this, fadeTime, false, ResumePauseAnimation, () =>
+            UIAnimationManager.Instance.SetAnimation(this, fadeTime, true,
+                (progress) => Animation(ScreenAnimType.Pause, progress),  
+                () =>
             {
                 isFade = false;
                 gameObject.SetActive(false);
@@ -98,14 +98,15 @@ namespace GameTools.UISystem
 
         internal void SetResume(float fadeTime = -1, Action callback = null)
         {
-            if(state!=ScreenState.Pause) throw new InvalidOperationException("cannot resume screen when state is not pause");
+            if (state != ScreenState.Pause) throw new InvalidOperationException("cannot resume screen when state is not pause");
             CompleteAnimation();
             state = ScreenState.Open;
             gameObject.SetActive(true);
             SafeCall(OnResume);
             isFade = true;
-            OpenCloseAnimation(1);
-            UIAnimationManager.Instance.SetAnimation(this, fadeTime, true, ResumePauseAnimation, () =>
+            UIAnimationManager.Instance.SetAnimation(this, fadeTime, true, 
+                (progress) => Animation(ScreenAnimType.Resume, progress), 
+                () =>
             {
                 isFade = false;
                 selfInteractable = true;
@@ -116,106 +117,140 @@ namespace GameTools.UISystem
         internal void SetClose(float fadeTime = -1, Action callback = null)
         {
             if (state == ScreenState.Close) throw new InvalidOperationException("cannot close screen when state is close");
-            if (state == ScreenState.Pause) fadeTime = -1;
             CompleteAnimation();
-            registeredGroup = null;
+            container = null;
+            ScreenState previousState = state;
             state = ScreenState.Close;
             selfInteractable = false;
-            SafeCall(OnClose);   
-            isFade = true;
-            ResumePauseAnimation(1);
-            UIAnimationManager.Instance.SetAnimation(this, fadeTime, false, OpenCloseAnimation, () =>
+            SafeCall(()=>OnClose(previousState));
+            if (previousState == ScreenState.Open)
             {
-                isFade = false;
+                isFade = true;
+                UIAnimationManager.Instance.SetAnimation(this, fadeTime, true, 
+                    (progress) => Animation(ScreenAnimType.Close, progress),
+                    () =>
+                    {
+                    isFade = false;
+                    gameObject.SetActive(false);
+                    callback?.Invoke();
+                    });
+            }
+            else
+            {
                 gameObject.SetActive(false);
                 callback?.Invoke();
-            });
+            }
         }
-        
-        private protected void SetOpen(Action onOpen, float fadeTime, ContainerBase group)
-        { 
-            if(state!= ScreenState.Close)  throw new InvalidOperationException("cannot open screen when state is not close");
+
+        private protected void SetOpen(Action onOpen, float fadeTime, ContainerBase container)
+        {
+            if (state != ScreenState.Close) throw new InvalidOperationException("cannot open screen when state is not close");
             CompleteAnimation();
             state = ScreenState.Open;
             gameObject.SetActive(true);
             SafeCall(onOpen);
-            registeredGroup = group;
+            this.container = container; // 延后保存container，防止onOpen时尝试打开其他screen(container在这时处于busy状态)
             isFade = true;
-            ResumePauseAnimation(1);
-            UIAnimationManager.Instance.SetAnimation(this, fadeTime, true, OpenCloseAnimation, () =>
+            UIAnimationManager.Instance.SetAnimation(this, fadeTime, true,
+                (progress) => Animation(ScreenAnimType.Open, progress), 
+                () =>
+                {
+                    isFade = false;
+                    selfInteractable = true;
+                });
+        }
+
+        protected virtual void Animation(ScreenAnimType animType, float progress)
+        {
+            canvasGroup.alpha = animType switch
             {
-                isFade = false;
-                selfInteractable = true;
-            });
-        }
-        
-        protected virtual void OpenCloseAnimation(float progress)
-        {
-            canvasGroup.alpha = progress;
+                ScreenAnimType.Open => progress,
+                ScreenAnimType.Pause => 1,
+                ScreenAnimType.Resume => 1,
+                ScreenAnimType.Close => 1 - progress,
+                _ => throw new ArgumentOutOfRangeException(nameof(animType), animType, null)
+            };
         }
 
-        protected virtual void ResumePauseAnimation(float progress)
-        {
-            canvasGroup.alpha = 1;
-        }
-       
-        void ILayerItem.SetInteractable(bool value) => globalInteractable = value;
+        void IContainerItem.SetInteractable(ref bool value) => SetInteractable(ref value);
+        void IContainerItem.SetOrder(ref int order) => SetOrder(ref order);
 
-        void ILayerItem.SetOrder(int order) => canvas.sortingOrder = order;
+        private protected virtual void SetInteractable(ref bool value)
+        {
+            if (state != ScreenState.Open && !isFade) return;
+            globalInteractable = value;
+            if (blockInput) value = false;
+        }
+
+        private protected virtual void SetOrder(ref int order)
+        {
+            canvas.sortingOrder = order;
+            order++;
+        }
+
 
         internal void SafeCall(Action action)
         {
-            try { action?.Invoke(); }
-            catch (Exception e) {  Debug.LogException( e,this); }
+            try
+            {
+                action?.Invoke();
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, this);
+            }
         }
 
-        
+
         #region 访问Container
+
         public T OpenScreen<T>(float fadeTime) where T : Screen
         {
-            if (registeredGroup != null && registeredGroup.isActive)
+            if (container != null && container.isActive)
             {
-                return registeredGroup.Open<T>(fadeTime);
+                return container.Open<T>(fadeTime);
             }
             return null;
         }
-        
-        public TScreen OpenScreen<TScreen, TParam>(TParam param,float fadeTime) where TScreen : Screen<TParam>
+
+        public TScreen OpenScreen<TScreen, TParam>(TParam param, float fadeTime) where TScreen : Screen<TParam>
         {
-            if (registeredGroup != null && registeredGroup.isActive)
+            if (container != null && container.isActive)
             {
-                return registeredGroup.Open<TScreen, TParam>(param, fadeTime);
+                return container.Open<TScreen, TParam>(param, fadeTime);
             }
             return null;
         }
 
         public void Close(float fadeTime)
         {
-            registeredGroup?.Close(this, fadeTime);
+            container?.Close(this, fadeTime);
         }
 
         #endregion
 
         #region 绑定系统
+
         protected T Find<T>(string path = null) where T : Component
         {
             Transform trans = Find(path);
-            if(trans == null) return null;
+            if (trans == null) return null;
             T target = trans.GetComponent<T>();
             return target;
         }
-        
+
         protected Transform Find(string path = null)
         {
             if (string.IsNullOrEmpty(path)) return transform;
-            return transform.Find(path); 
+            return transform.Find(path);
         }
 
-        
+
         [AttributeUsage(AttributeTargets.Field | AttributeTargets.Method, AllowMultiple = true)]
         protected sealed class AutoBindAttribute : Attribute
         {
             public readonly string path;
+
             public AutoBindAttribute(string path)
             {
                 this.path = path;
@@ -223,6 +258,7 @@ namespace GameTools.UISystem
         }
 
         private Action bindAction, unbindAction;
+
         protected void RegisterBindAction(Action bindAction, Action unbindAction)
         {
             this.bindAction += bindAction;
@@ -241,23 +277,28 @@ namespace GameTools.UISystem
             foreach (var field in fields)
             {
                 if (!field.IsDefined(typeof(AutoBindAttribute), true)) continue;
-
                 if (field.GetValue(this) is IBindWithGameObject bind)
                 {
                     foreach (var attr in field.GetCustomAttributes<AutoBindAttribute>(true))
                     {
                         string path = attr.path;
-                        GameObject trans = Find(path).gameObject;
+                        Transform trans = Find(path);
+                        if (trans == null)
+                        {
+                            Debug.LogError($"fail to bind with {attr.path}");
+                            continue;
+                        }
+                        GameObject obj = Find(path).gameObject;
                         var bind1 = bind;
                         RegisterBindAction(() =>
                             {
-                              var(find, process)  = bind1.Bind(trans.gameObject);
-                              if (find == 0) { throw new Exception($"fail to bind with {path}"); }
+                                var (find, process) = bind1.Bind(obj);
+                                if (find == 0) Debug.LogError($"fail to bind with {path}");
                             },
-                            () => bind.Unbind(trans));
+                            () => bind.Unbind(obj));
                     }
                 }
-                else throw new Exception($"field: {field.Name}未继承IBindToGameObject接口无法实现自动绑定");
+                else Debug.LogError($"field: {field.Name} 未继承IBindToGameObject接口无法实现自动绑定");
             }
         }
 
@@ -273,6 +314,11 @@ namespace GameTools.UISystem
                     if (parameters.Length == 0)
                     {
                         Button button = Find<Button>(attr.path);
+                        if (button == null)
+                        {
+                            Debug.LogError($"fail to bind with {attr.path}");
+                            continue;
+                        }
                         UnityAction action = (UnityAction)Delegate.CreateDelegate(typeof(UnityAction), this, method);
                         RegisterBindAction(
                             () => button.onClick.AddListener(action),
@@ -281,12 +327,20 @@ namespace GameTools.UISystem
                     else if (parameters.Length == 1)
                     {
                         var parameter = parameters[0].ParameterType;
-                        if (parameter.IsByRef) throw new Exception("参数带 ref/in/out，无法绑定");
+                        if (parameter.IsByRef)
+                        {
+                            Debug.LogError("参数带 ref/in/out，无法绑定");
+                            continue;
+                        }
                         if (parameter == typeof(float))
                         {
                             Slider slider = Find<Slider>(attr.path);
-                            UnityAction<float> action =
-                                (UnityAction<float>)Delegate.CreateDelegate(typeof(UnityAction<float>), this, method);
+                            if (slider == null)
+                            {
+                                Debug.LogError($"fail to bind with {attr.path}");
+                                continue;
+                            }
+                            var action = (UnityAction<float>)Delegate.CreateDelegate(typeof(UnityAction<float>), this, method);
                             RegisterBindAction(
                                 () => slider.onValueChanged.AddListener(action),
                                 () => slider.onValueChanged.RemoveListener(action));
@@ -294,8 +348,12 @@ namespace GameTools.UISystem
                         else if (parameter == typeof(bool))
                         {
                             Toggle toggle = Find<Toggle>(attr.path);
-                            UnityAction<bool> action =
-                                (UnityAction<bool>)Delegate.CreateDelegate(typeof(UnityAction<bool>), this, method);
+                            if (toggle == null)
+                            { 
+                                Debug.LogError($"fail to bind with {attr.path}");
+                                continue;
+                            }
+                            var action = (UnityAction<bool>)Delegate.CreateDelegate(typeof(UnityAction<bool>), this, method);
                             RegisterBindAction(
                                 () => toggle.onValueChanged.AddListener(action),
                                 () => toggle.onValueChanged.RemoveListener(action));
@@ -303,24 +361,37 @@ namespace GameTools.UISystem
                         else if (parameter == typeof(string))
                         {
                             TMP_InputField inputField = Find<TMP_InputField>(attr.path);
-                            UnityAction<string> action = (UnityAction<string>)Delegate.CreateDelegate(typeof(UnityAction<string>), this, method);
+                            if (inputField == null)
+                            {
+                                Debug.LogError($"fail to bind with {attr.path}");
+                                continue;
+                            }
+                            var action = (UnityAction<string>)Delegate.CreateDelegate(typeof(UnityAction<string>), this, method);
                             RegisterBindAction(
                                 () => inputField.onValueChanged.AddListener(action),
                                 () => inputField.onValueChanged.RemoveListener(action));
-                        } 
+                        }
                         else if (parameter == typeof(int))
                         {
                             TMP_Dropdown dropdown = Find<TMP_Dropdown>(attr.path);
-                            UnityAction<int> action = (UnityAction<int>)Delegate.CreateDelegate(typeof(UnityAction<int>), this, method);
+                            if (dropdown == null)
+                            {
+                                Debug.LogError($"fail to bind with {attr.path}");
+                                continue;
+                            }
+                            var action = (UnityAction<int>)Delegate.CreateDelegate(typeof(UnityAction<int>), this, method);
                             RegisterBindAction(
                                 () => dropdown.onValueChanged.AddListener(action),
                                 () => dropdown.onValueChanged.RemoveListener(action));
                         }
-                        else { throw new Exception($"Method: {method} 不支持自动绑定"); }
+                        else
+                        {
+                            Debug.LogError($"Method: {method} 不支持自动绑定");
+                        }
                     }
                     else // > 1
                     {
-                        throw new Exception($"Method: {method} 不支持自动绑定");
+                        Debug.LogError($"Method: {method} 不支持自动绑定, 参数大于1");
                     }
                 }
             }

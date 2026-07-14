@@ -1,14 +1,11 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-
 
 namespace GameTools.UISystem
 {
     public static partial class UIManager
     {
-
         private struct Layer 
         {
             public readonly string name;
@@ -21,36 +18,71 @@ namespace GameTools.UISystem
                 this.container = container;
             }
         }
-
-        private static List<Layer> layers = new();
-
-        /*public static void RegisterLayer(string name, int layerOrder, ContainerBase container)
+        private static readonly List<Layer> layers = new();
+        public static TContainer AddLayer<TContainer>(int layerOrder, string name = null) where TContainer : ContainerBase, new()
         {
-            if (layers.Exists(x => x.name == name)) throw new ArgumentException($"name: {name} already exists");
-            int index = layers.FindLastIndex(item => item.sortOrder < layerOrder)+1;
-            layers.Insert(index, (name, layerOrder, container));
-        }*/
-
-        public static TContainer AddLayer<TContainer>(string name, int layerOrder) where TContainer : ContainerBase, new()
-        {
-            if (layers.Exists(x => x.name == name)) throw new ArgumentException($"name: {name} already exists");
-            int index = layers.FindLastIndex(item => item.sortOrder < layerOrder)+1;
+            if (name != null && layers.Exists(x => x.name == name)) throw new ArgumentException($"name: {name} already exists");
+            int index = layers.FindLastIndex(item => item.sortOrder <= layerOrder)+1;
             TContainer container = new();
             layers.Insert(index, new Layer(name, layerOrder, container));
             return container;
         }
-
-        public static TContainer GetContainer<TContainer>(string name) where TContainer : ContainerBase, new()
+        
+        public static void AddLayer(ContainerBase container, int layerOrder, string name = null)
         {
+            if (name != null && layers.Exists(x => x.name == name)) throw new ArgumentException($"name: {name} already exists");
+            if(layers.Exists(x => x.container == container)) throw new ArgumentException($"{container} already exists");
+            int index = layers.FindLastIndex(item => item.sortOrder <= layerOrder)+1;
+            layers.Insert(index, new Layer(name, layerOrder, container));
+            if (!container.isActive || container.count == 0) return;
+            UpdateOrder();
+            UpdateInteractable();
+        }
+
+        public static void ChangeOrder(ContainerBase container, int newOrder)
+        {
+            if(container== null) throw new ArgumentNullException(nameof(container));
+           int oldIndex = layers.FindIndex((l) => l.container == container);
+           if (oldIndex == -1) throw new Exception($"{container} not found");
+           Layer oldLayer = layers[oldIndex];
+           layers.RemoveAt(oldIndex);
+           
+           int newIndex = layers.FindLastIndex(item => item.sortOrder <= newOrder)+1;
+           layers.Insert(newIndex, new Layer(oldLayer.name, newOrder, container));
+           if (!container.isActive || container.count == 0) return;
+           UpdateOrder();
+           UpdateInteractable();
+        }
+        
+        public static void ChangeOrder(string name, int newOrder)
+        {
+            if(name == null) throw new ArgumentNullException($"{nameof(name)}为null的是匿名layer，你无法查询它");
+            int oldIndex = layers.FindIndex((l) => l.name == name);
+            if (oldIndex == -1) throw new Exception($"name: {name} not found");
+            Layer oldLayer = layers[oldIndex];
+            ContainerBase container = oldLayer.container;
+            layers.RemoveAt(oldIndex);
+            int newIndex = layers.FindLastIndex(item => item.sortOrder <= newOrder)+1;
+            layers.Insert(newIndex, new Layer(oldLayer.name, newOrder, container));
+            if (!container.isActive || container.count == 0) return;
+            UpdateOrder();
+            UpdateInteractable();
+        }
+
+        public static ContainerBase GetContainer(string name)
+        {
+            if(name == null) throw new ArgumentNullException($"{nameof(name)}为null的是匿名layer，你无法查询它");
             int index = layers.FindIndex(item => item.name == name);
-            if (index<0)
-            {
-                Debug.LogError($"name: {name} not found");
-                return null;
-            }
-            var containerBase =  layers[index].container;
+            if (index >= 0) return layers[index].container;
+            Debug.LogError($"name: {name} not found");
+            return null;
+        }
+
+        public static TContainer GetContainer<TContainer>(string name) where TContainer : ContainerBase
+        {
+            ContainerBase containerBase = GetContainer(name);
             if (containerBase is TContainer container)  return container;
-            Debug.LogError($"type: {typeof(TContainer)} not match with type: {containerBase.GetType()}");
+            if (containerBase != null) Debug.LogError($"type: {typeof(TContainer)} not match with type: {containerBase.GetType()}");  
             return null;
         }
         
@@ -74,11 +106,7 @@ namespace GameTools.UISystem
             }
         }
         
-        public static IDisposable DelayStateUpdateScope()
-        {
-            return new DelayScope();
-        }
-
+        internal static IDisposable GetDelayScope() => new DelayScope();
         private sealed class DelayScope : IDisposable
         {
             private bool disposed;

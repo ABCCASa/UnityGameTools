@@ -5,20 +5,21 @@ using UnityEngine;
 
 namespace GameTools.UISystem
 {
-    public class UIAnimationManager: MonoLazySingleton<UIAnimationManager>
+    internal class UIAnimationManager : MonoLazySingleton<UIAnimationManager>
     {
-        public const float minTime = 1 / 60f;
-        List<UIAnimationTask> controllers = new();
-        public struct UIAnimationTask
+        private const float MinTime = 1 / 240f;
+        private readonly List<AnimController> controllers = new();
+        private struct AnimController
         {
+            public bool isComplete;
+            public int lastUpdateFrame;
             public readonly object reference;
             public readonly bool forward;
             public float progress;
             public float speed;
             public readonly Action<float> animation;
             public readonly Action onComplete;
-
-            public UIAnimationTask(object reference, float speed, bool forward, Action<float> animation, Action onComplete)
+            public AnimController(object reference, float speed, bool forward, Action<float> animation, Action onComplete, int lastUpdateFrame)
             {
                 progress = 0;
                 this.reference = reference;
@@ -26,81 +27,83 @@ namespace GameTools.UISystem
                 this.forward = forward;
                 this.animation = animation;
                 this.onComplete = onComplete;
+                this.lastUpdateFrame = lastUpdateFrame;
+                isComplete = false;
             }
         }
 
         public void SetAnimation(object reference, float fadeTime, bool forward, Action<float> animation, Action onComplete)
         {
             CompleteAnimation(reference);
-            if (fadeTime <= minTime)
-            {  
-                animation?.Invoke(forward?1:0);
+            if (fadeTime <= MinTime)
+            {
+                animation?.Invoke(forward ? 1 : 0);
                 onComplete?.Invoke();
                 return;
             }
-            animation?.Invoke(forward?0:1);
-            UIAnimationTask controller = new (reference, 1 / fadeTime, forward, animation, onComplete);
+            animation?.Invoke(forward ? 0 : 1);
+            AnimController controller = new AnimController(reference, 1 / fadeTime, forward, animation, onComplete, Time.frameCount);
             controllers.Add(controller);
         }
 
-
-        public  bool HasAnimation(object reference)
+        private int IndexOf(object reference) => controllers.FindIndex(x => x.reference == reference && !x.isComplete);
+        
+        public bool HasAnimation(object reference)
         {
-            int index = controllers.FindIndex(x => x.reference == reference);
+            int index = IndexOf(reference);
             return index >= 0;
         }
 
-        public void SpeedUpAnimation(object reference, float fadeTime)
+        public bool SpeedUpAnimation(object reference, float fadeTime)
         {
-            int index = controllers.FindIndex(x => x.reference == reference);
-            if (index != -1)
-            {
-                var controller = controllers[index];
-                if (fadeTime <= minTime)
-                {
-                    controllers.RemoveAt(index);
-                    controller.animation?.Invoke(controller.forward?1:0);
-                    controller.onComplete?.Invoke();
-                }
-                else
-                {
-                    controller.speed += 1 / fadeTime;
-                    controllers[index] = controller;
-                }
-            }  
+            if (fadeTime <= MinTime) return CompleteAnimation(reference);
+            int index = IndexOf(reference);
+            if (index == -1) return false;
+            var controller = controllers[index];
+            controller.speed += 1 / fadeTime;
+            controllers[index] = controller;
+            return true;
         }
 
-        public void CompleteAnimation(object reference)
+        public bool CompleteAnimation(object reference)
         {
-            int index = controllers.FindIndex(x => x.reference == reference);
-            if (index != -1)
-            {   
-                var controller = controllers[index];
-                controllers.RemoveAt(index);
-                controller.animation?.Invoke(controller.forward?1:0);
-                controller.onComplete?.Invoke();
-            }  
+            int index = IndexOf(reference);
+            if (index == -1) return false;
+            var controller = controllers[index];
+            controller.isComplete = true;
+            controllers[index] = controller;
+            controller.animation?.Invoke(controller.forward ? 1 : 0);
+            controller.onComplete?.Invoke();
+            return true;
         }
 
-        private void Update()
+        private void LateUpdate()
         {
-            using ( UIManager.DelayStateUpdateScope())
+            using (UIManager.GetDelayScope())
             {
+                int currentFrame = Time.frameCount;
                 for (int i = controllers.Count - 1; i >= 0; i--)
                 {
                     var controller = controllers[i];
+                    if (controller.isComplete)
+                    {
+                        controllers.RemoveAt(i);
+                        continue;
+                    }
+                    if (controller.lastUpdateFrame >= currentFrame) continue;
                     controller.progress += Time.unscaledDeltaTime * controller.speed;
                     if (controller.progress >= 1)
-                    { 
+                    {
                         controllers.RemoveAt(i);
-                        controller.animation?.Invoke(controller.forward?1:0);
+                        controller.animation?.Invoke(controller.forward ? 1 : 0);
                         controller.onComplete?.Invoke();
                     }
                     else
                     {
+                        controller.lastUpdateFrame = currentFrame;
                         controllers[i] = controller;
                         float p = controller.progress;
-                        controller.animation?.Invoke(controller.forward? p : 1-p);
+                        controller.animation?.Invoke(controller.forward ? p : 1 - p);
                     }
                 }
             }

@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Pool;
 using Object = UnityEngine.Object;
-
 
 namespace GameTools.UISystem
 {
@@ -26,14 +24,13 @@ namespace GameTools.UISystem
         }
 
         private static readonly int maxCacheCount = 2;
-
         private static readonly Dictionary<Type, ObjectPool<ScreenBase>> screenPools = new(64);
 
         private static ObjectPool<ScreenBase> GetPool(Type type)
         {
             if (!screenPools.TryGetValue(type, out ObjectPool<ScreenBase> pool))
             {
-                pool = new ObjectPool<ScreenBase>(
+                pool = new ObjectPool<ScreenBase> (
                     createFunc: () =>
                     {
                         string path = $"UI/Screens/{type.Name}";

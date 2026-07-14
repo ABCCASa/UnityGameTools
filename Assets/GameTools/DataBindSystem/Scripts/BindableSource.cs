@@ -143,11 +143,8 @@ namespace GameTools.DataBindSystem
             var items =  obj.GetComponents<IBindingTarget<T>>();
             foreach (var item in items)
             {
-                if (Bind(item)) { bindCount++; }
-                else
-                {
-                    Debug.LogError($"{item} 已经绑定了其他source");
-                }
+                if (Bind(item)) bindCount++;
+                else Debug.LogError($"{item} 已经绑定了其他source");
             }
             return (items.Length ,bindCount);
         }

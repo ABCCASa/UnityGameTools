@@ -50,14 +50,13 @@ namespace GameTools.GameTask
     public struct GameTaskMethodBuilder
     {
         private IStateMachineRunner smBox;
-        private GameTask task;
-        public GameTask Task => task;
 
+        public GameTask Task { get; private set; }
         public static GameTaskMethodBuilder Create() => new GameTaskMethodBuilder();
 
         public void Start<TStateMachine>(ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine
         {
-            task = GameTask.Get();
+            Task = GameTask.Get();
             var box = StateMachineBox<TStateMachine>.Get();
             smBox = box; //先把 box 赋给 builder 的 sm，是因为状态机里包含 builder；Init 复制状态机时，只有这样复制进去的那份状态机副本里的 builder 才会带着 sm = box，从而在后续 await 挂起时，能够通过 builder 找回这个 box。
             box.Init(ref stateMachine);
@@ -66,14 +65,14 @@ namespace GameTools.GameTask
 
         public void SetResult()
         {
-            var t = task; // 提前缓存source，否则 sm_box 被修改时里面是sm会被初始化，导致source丢失
+            var t = Task; // 提前缓存source，否则 sm_box 被修改时里面是sm会被初始化，导致source丢失
             smBox.Release();
             t.SetResult();
         }
 
         public void SetException(Exception ex)
         {
-            var t = task;
+            var t = Task;
             smBox.Release();
             t.SetException(ex);
         }
@@ -98,13 +97,13 @@ namespace GameTools.GameTask
     public struct GameTaskMethodBuilder<T>
     {
         private IStateMachineRunner smBox;
-        private GameTask<T> task;
-        public GameTask<T> Task => task;
+
+        public GameTask<T> Task { get; private set; }
         public static GameTaskMethodBuilder<T> Create() => new GameTaskMethodBuilder<T>();
 
         public void Start<TStateMachine>(ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine
         {
-            task = GameTask<T>.Get();
+            Task = GameTask<T>.Get();
             var box = StateMachineBox<TStateMachine>.Get();
             smBox = box;
             box.Init(ref stateMachine);
@@ -113,14 +112,14 @@ namespace GameTools.GameTask
 
         public void SetResult(T result)
         {
-            var t = task;
+            var t = Task;
             smBox.Release();
             t.SetResult(result);
         }
 
         public void SetException(Exception ex)
         {
-            var t = task;
+            var t = Task;
             smBox.Release();
             t.SetException(ex);
         }

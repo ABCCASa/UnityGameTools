@@ -8,11 +8,9 @@ namespace GameTools.GameTask
 {
     public partial class GameTask
     {
-        public async void Forget() { await this; }
         public static AsyncLoop UpdateAsync() => GameTaskLoopScheduler.update;
         public static AsyncLoop FixedUpdateAsync() => GameTaskLoopScheduler.fixedUpdate;
         public static AsyncLoop LateUpdateAsync() => GameTaskLoopScheduler.lateUpdate;
-
         public static async GameTask WhenAll(params GameTask[] tasks)
         {
             if (tasks == null || tasks.Length == 0) return;
@@ -37,7 +35,6 @@ namespace GameTools.GameTask
         public static async GameTask<T[]> WhenAll(params GameTask<T>[] tasks)
         {
             if (tasks == null || tasks.Length == 0) return Array.Empty<T>();
-
             var results = new T[tasks.Length];
             Exception first = null;
             for (int i = 0; i < tasks.Length; i++)
