@@ -11,7 +11,7 @@ namespace GameTools.UISystem
         public abstract T Open<T>(float fadeTime = -1) where T : Screen;
         public abstract TScreen Open<TScreen, TParam>(TParam param, float fadeTime = -1) where TScreen : Screen<TParam>;
         public abstract void Close(ScreenBase screen, float fadeTime = -1f);
-        public abstract void CloseAll();
+        public abstract void CloseAll(float fadeTime = -1f);
         public void SetActive(bool active)
         {
             if(isActive == active) return;

@@ -8,18 +8,27 @@ using UnityEngine.UI;
 
 namespace GameTools.UISystem
 {
+    
+    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Method, AllowMultiple = true)]
+    public sealed class AutoBindAttribute : Attribute
+    {
+        public readonly string path;
+        public AutoBindAttribute(string path)
+        {
+            this.path = path;
+        }
+    }
+    
     public enum ScreenAnimType { Open, Pause, Resume, Close }
     public enum ScreenState { Open, Close, Pause }
 
     [RequireComponent(typeof(Canvas), typeof(CanvasGroup))]
-    public abstract class ScreenBase : MonoBehaviour, IContainerItem
+    public abstract class ScreenBase: MonoBehaviour, IContainerItem 
     {
         internal ScreenBase() { }
         [SerializeField] private Canvas canvas;
         [SerializeField] private CanvasGroup canvasGroup;
-        private ContainerBase container;
-        
-
+        private ContainerBase parentContainer;
         private bool _globalInteractable, _selfInteractable;
         private bool globalInteractable
         {
@@ -29,7 +38,6 @@ namespace GameTools.UISystem
                 canvasGroup.interactable = _globalInteractable && _selfInteractable;
             }
         }
-
         private protected bool selfInteractable
         {
             set
@@ -41,8 +49,8 @@ namespace GameTools.UISystem
 
         public ScreenState state { get; private set; } = ScreenState.Close;
         public bool isFade { get; private set; }
-        public abstract bool blockInput { get; }
-        public virtual bool enableAutoBind => true;
+        protected abstract bool blockInput { get; }
+        protected virtual bool enableAutoBind => true;
 
         protected virtual void OnInit() { }
         protected virtual void OnClose(ScreenState previousState) { }
@@ -89,11 +97,11 @@ namespace GameTools.UISystem
             UIAnimationManager.Instance.SetAnimation(this, fadeTime, true,
                 (progress) => Animation(ScreenAnimType.Pause, progress),  
                 () =>
-            {
+                {
                 isFade = false;
                 gameObject.SetActive(false);
                 callback?.Invoke();
-            });
+                });
         }
 
         internal void SetResume(float fadeTime = -1, Action callback = null)
@@ -106,19 +114,19 @@ namespace GameTools.UISystem
             isFade = true;
             UIAnimationManager.Instance.SetAnimation(this, fadeTime, true, 
                 (progress) => Animation(ScreenAnimType.Resume, progress), 
-                () =>
-            {
+                () => 
+                {
                 isFade = false;
                 selfInteractable = true;
                 callback?.Invoke();
-            });
+                });
         }
 
         internal void SetClose(float fadeTime = -1, Action callback = null)
         {
             if (state == ScreenState.Close) throw new InvalidOperationException("cannot close screen when state is close");
             CompleteAnimation();
-            container = null;
+            parentContainer = null;
             ScreenState previousState = state;
             state = ScreenState.Close;
             selfInteractable = false;
@@ -142,14 +150,14 @@ namespace GameTools.UISystem
             }
         }
 
-        private protected void SetOpen(Action onOpen, float fadeTime, ContainerBase container)
+        private protected void SetOpen(Action onOpen, float fadeTime, ContainerBase container, Action callback = null)
         {
             if (state != ScreenState.Close) throw new InvalidOperationException("cannot open screen when state is not close");
             CompleteAnimation();
             state = ScreenState.Open;
             gameObject.SetActive(true);
             SafeCall(onOpen);
-            this.container = container; // 延后保存container，防止onOpen时尝试打开其他screen(container在这时处于busy状态)
+            this.parentContainer = container; // 延后保存container，防止onOpen时尝试打开其他screen(container在这时处于busy状态)
             isFade = true;
             UIAnimationManager.Instance.SetAnimation(this, fadeTime, true,
                 (progress) => Animation(ScreenAnimType.Open, progress), 
@@ -157,7 +165,14 @@ namespace GameTools.UISystem
                 {
                     isFade = false;
                     selfInteractable = true;
+                    callback?.Invoke();
                 });
+        }
+        
+        private void SafeCall(Action action)
+        {
+            try { action?.Invoke(); }
+            catch (Exception e) { Debug.LogException(e, this); }
         }
 
         protected virtual void Animation(ScreenAnimType animType, float progress)
@@ -188,48 +203,40 @@ namespace GameTools.UISystem
             order++;
         }
 
-
-        internal void SafeCall(Action action)
-        {
-            try
-            {
-                action?.Invoke();
-            }
-            catch (Exception e)
-            {
-                Debug.LogException(e, this);
-            }
-        }
-
-
+   
+        
         #region 访问Container
 
         public T OpenScreen<T>(float fadeTime) where T : Screen
         {
-            if (container != null && container.isActive)
+            if (parentContainer != null && parentContainer.isActive)
             {
-                return container.Open<T>(fadeTime);
+                return parentContainer.Open<T>(fadeTime);
             }
             return null;
         }
 
         public TScreen OpenScreen<TScreen, TParam>(TParam param, float fadeTime) where TScreen : Screen<TParam>
         {
-            if (container != null && container.isActive)
+            if (parentContainer != null && parentContainer.isActive)
             {
-                return container.Open<TScreen, TParam>(param, fadeTime);
+                return parentContainer.Open<TScreen, TParam>(param, fadeTime);
             }
             return null;
         }
 
         public void Close(float fadeTime)
         {
-            container?.Close(this, fadeTime);
+            parentContainer?.Close(this, fadeTime);
         }
 
         #endregion
 
         #region 绑定系统
+        protected Transform Find(string path = null)
+        {
+            return string.IsNullOrEmpty(path) ? transform : transform.Find(path);
+        }
 
         protected T Find<T>(string path = null) where T : Component
         {
@@ -239,26 +246,9 @@ namespace GameTools.UISystem
             return target;
         }
 
-        protected Transform Find(string path = null)
-        {
-            if (string.IsNullOrEmpty(path)) return transform;
-            return transform.Find(path);
-        }
-
-
-        [AttributeUsage(AttributeTargets.Field | AttributeTargets.Method, AllowMultiple = true)]
-        protected sealed class AutoBindAttribute : Attribute
-        {
-            public readonly string path;
-
-            public AutoBindAttribute(string path)
-            {
-                this.path = path;
-            }
-        }
+       
 
         private Action bindAction, unbindAction;
-
         protected void RegisterBindAction(Action bindAction, Action unbindAction)
         {
             this.bindAction += bindAction;
@@ -384,15 +374,9 @@ namespace GameTools.UISystem
                                 () => dropdown.onValueChanged.AddListener(action),
                                 () => dropdown.onValueChanged.RemoveListener(action));
                         }
-                        else
-                        {
-                            Debug.LogError($"Method: {method} 不支持自动绑定");
-                        }
+                        else Debug.LogError($"Method: {method} 不支持自动绑定");
                     }
-                    else // > 1
-                    {
-                        Debug.LogError($"Method: {method} 不支持自动绑定, 参数大于1");
-                    }
+                    else Debug.LogError($"Method: {method} 不支持自动绑定, 参数大于1"); // > 1
                 }
             }
         }

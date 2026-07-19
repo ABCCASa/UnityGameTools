@@ -56,7 +56,7 @@ namespace GameTools.UISystem
         
         public static void ChangeOrder(string name, int newOrder)
         {
-            if(name == null) throw new ArgumentNullException($"{nameof(name)}为null的是匿名layer，你无法查询它");
+            if (name == null) throw new ArgumentNullException($"{nameof(name)}为null的是匿名layer，你无法查询它");
             int oldIndex = layers.FindIndex((l) => l.name == name);
             if (oldIndex == -1) throw new Exception($"name: {name} not found");
             Layer oldLayer = layers[oldIndex];
@@ -71,7 +71,7 @@ namespace GameTools.UISystem
 
         public static ContainerBase GetContainer(string name)
         {
-            if(name == null) throw new ArgumentNullException($"{nameof(name)}为null的是匿名layer，你无法查询它");
+            if (name == null) throw new ArgumentNullException($"{nameof(name)}为null的是匿名layer，你无法查询它");
             int index = layers.FindIndex(item => item.name == name);
             if (index >= 0) return layers[index].container;
             Debug.LogError($"name: {name} not found");

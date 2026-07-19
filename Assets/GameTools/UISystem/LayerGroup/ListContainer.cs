@@ -14,12 +14,12 @@ namespace GameTools.UISystem
 
         public TScreen Open<TScreen>(float fadeTime = -1, bool addAbove = true, ScreenBase relative = null) where TScreen : Screen
         {
-            return OpenBase<TScreen>(screen => screen.SetOpen(fadeTime, this) ,addAbove, relative);
+            return OpenBase<TScreen>(screen => screen.SetOpen(fadeTime, this), addAbove, relative);
         }
 
         public TScreen Open<TScreen, TParam>(TParam param, float fadeTime = -1, bool addAbove = true, ScreenBase relative = null) where TScreen : Screen<TParam>
         {
-            return OpenBase<TScreen>(screen => screen.SetOpen(param, fadeTime, this) ,addAbove, relative);
+            return OpenBase<TScreen>(screen => screen.SetOpen(param, fadeTime, this), addAbove, relative);
         }
         
         private TScreen OpenBase<TScreen>(Action<TScreen> openAction, bool addAbove, ScreenBase relative) where TScreen : ScreenBase
@@ -127,7 +127,7 @@ namespace GameTools.UISystem
             }
         }
 
-        public override void CloseAll()
+        public override void CloseAll(float fadeTime = -1f)
         {
             using (GetBusyScope())
             {
@@ -137,17 +137,39 @@ namespace GameTools.UISystem
                     var screen = screenList[i];
                     if (screen.state == ScreenState.Close)
                     {
-                        if (screen.isFade) screen.CompleteAnimation(); // 回调中自带移除
-                        else throw new ArgumentException("List中出现完全关闭的Screen");
+                        Assert.IsTrue(screen.isFade);
+                        screen.SpeedUpAnimation(fadeTime); // 加快动画
                     }
                     else
                     { 
-                        screenList.Remove(screen);
-                        screen.SetClose(-1, () => { UIManager.ReleaseScreen(screen); });
+                        screen.SetClose(fadeTime, () =>
+                        {
+                            screenList.Remove(screen);
+                            UIManager.ReleaseScreen(screen);
+                            UIManager.UpdateInteractable();
+                        });
                     }
                 }
-                Assert.IsTrue(screenList.Count  == 0);
-                if (isActive) UIManager.UpdateInteractable();
+            }
+        }
+        
+        public void SpeedUpAnimations(float fadeTime)
+        {
+            for (int i = screenList.Count - 1; i >= 0; i--)
+            {
+                var screen = screenList[i];
+                if (screen.isFade) screen.SpeedUpAnimation(fadeTime);
+                else Assert.IsFalse(screen.state == ScreenState.Close);
+            }
+        }
+
+        public void CompleteAnimations()
+        {
+            for (int i = screenList.Count - 1; i >= 0; i--)
+            {
+                var screen = screenList[i];
+                if (screen.isFade) screen.CompleteAnimation();
+                else Assert.IsFalse(screen.state == ScreenState.Close);
             }
         }
 

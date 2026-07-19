@@ -88,6 +88,7 @@ namespace GameTools.UISystem
             {
                 var screen = screenStack[i];
                 if (screen.isFade) screen.SpeedUpAnimation(fadeTime);
+                else Assert.IsFalse(screen.state == ScreenState.Close);
             }
         }
 
@@ -97,6 +98,7 @@ namespace GameTools.UISystem
             {
                 var screen = screenStack[i];
                 if (screen.isFade) screen.CompleteAnimation();
+                else Assert.IsFalse(screen.state == ScreenState.Close);
             }
         }
 
@@ -128,7 +130,7 @@ namespace GameTools.UISystem
             }
         }
 
-        public override void CloseAll()
+        public override void CloseAll(float fadeTime = -1)
         {
             using (GetBusyScope())
             {
@@ -140,17 +142,19 @@ namespace GameTools.UISystem
                         var screen = screenStack[i];
                         if (screen.state == ScreenState.Close)
                         {
-                            if (screen.isFade) screen.CompleteAnimation(); // 回调中自带移除
-                            else throw new ArgumentException("List中出现完全关闭的Screen");
+                            Assert.IsTrue(screen.isFade);
+                            screen.SpeedUpAnimation(fadeTime); // 加快动画
                         }
                         else
                         {
-                            screen.SetClose(-1, () => { UIManager.ReleaseScreen(screen); });
-                            screenStack.Remove(screen);
+                            screen.SetClose(fadeTime, () =>
+                            {
+                                screenStack.Remove(screen);
+                                UIManager.ReleaseScreen(screen);
+                                UIManager.UpdateInteractable();
+                            });
                         }
                     }
-                    Assert.IsTrue(screenStack.Count == 0);
-                    if (isActive) UIManager.UpdateInteractable();
                 }
             }
         }

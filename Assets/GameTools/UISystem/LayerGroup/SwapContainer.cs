@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using UnityEngine;
 using UnityEngine.Assertions;
 
 namespace GameTools.UISystem
@@ -10,14 +9,15 @@ namespace GameTools.UISystem
         private ScreenBase currentScreen;
         private readonly List<ScreenBase> fadeOutScreens = new();
         public override int count => fadeOutScreens.Count + (currentScreen == null ? 0 : 1);
-        public override TScreen Open<TScreen>(float fadeTime = -1) 
+
+        public override TScreen Open<TScreen>(float fadeTime = -1)
         {
-            return OpenBase<TScreen>(screen => screen.SetOpen(fadeTime, this),fadeTime);
+            return OpenBase<TScreen>(screen => screen.SetOpen(fadeTime, this), fadeTime);
         }
 
-        public override TScreen Open<TScreen, TParam>(TParam param, float fadeTime = -1) 
+        public override TScreen Open<TScreen, TParam>(TParam param, float fadeTime = -1)
         {
-          return OpenBase<TScreen>(screen => screen.SetOpen(param, fadeTime, this),fadeTime);
+            return OpenBase<TScreen>(screen => screen.SetOpen(param, fadeTime, this), fadeTime);
         }
 
         private TScreen OpenBase<TScreen>(Action<TScreen> openAction, float fadeTime) where TScreen : ScreenBase
@@ -37,6 +37,7 @@ namespace GameTools.UISystem
                         UIManager.UpdateInteractable();
                     });
                 }
+
                 var screen = UIManager.GetScreen<TScreen>();
                 openAction.Invoke(screen);
                 currentScreen = screen;
@@ -45,7 +46,6 @@ namespace GameTools.UISystem
                 return screen;
             }
         }
-
 
         public override void Close(ScreenBase screen, float fadeTime = -1)
         {
@@ -69,10 +69,12 @@ namespace GameTools.UISystem
         {
             for (int i = fadeOutScreens.Count - 1; i >= 0; i--)
             {
-                var screen =fadeOutScreens[i];
-                if (screen.isFade) screen.SpeedUpAnimation(fadeTime);
+                var screen = fadeOutScreens[i];
+                Assert.IsTrue(screen.isFade);
+                screen.SpeedUpAnimation(fadeTime);
             }
-            if(currentScreen != null && currentScreen.isFade) currentScreen.SpeedUpAnimation(fadeTime);
+
+            if (currentScreen != null && currentScreen.isFade) currentScreen.SpeedUpAnimation(fadeTime);
         }
 
         public void CompleteAnimations()
@@ -80,10 +82,12 @@ namespace GameTools.UISystem
             for (int i = fadeOutScreens.Count - 1; i >= 0; i--)
             {
                 var screen = fadeOutScreens[i];
-                if (screen.isFade) screen.CompleteAnimation();
+                Assert.IsTrue(screen.isFade);
+                screen.CompleteAnimation();
             }
+
             Assert.IsTrue(fadeOutScreens.Count == 0);
-            if(currentScreen != null && currentScreen.isFade) currentScreen.CompleteAnimation();
+            if (currentScreen != null && currentScreen.isFade) currentScreen.CompleteAnimation();
         }
 
         private protected override void OnPause()
@@ -92,7 +96,7 @@ namespace GameTools.UISystem
             {
                 using (UIManager.GetDelayScope())
                 {
-                    if(currentScreen != null)  currentScreen.SetPause();
+                    if (currentScreen != null) currentScreen.SetPause();
                     CompleteAnimations(); // 清理退出一半的Screen
                     UIManager.UpdateOrder();
                     UIManager.UpdateInteractable();
@@ -111,20 +115,23 @@ namespace GameTools.UISystem
             }
         }
 
-        public override void CloseAll()
+        public override void CloseAll(float fadeTime = -1)
         {
             using (GetBusyScope())
             {
                 using (UIManager.GetDelayScope())
                 {
-                    if (currentScreen != null)
+                    SpeedUpAnimations(fadeTime);
+                    if (currentScreen == null) return;
+                    var screen = currentScreen;
+                    currentScreen = null;
+                    fadeOutScreens.Add(screen);
+                    screen?.SetClose(fadeTime, () =>
                     {
-                        var screen = currentScreen;
-                        currentScreen = null;
-                        screen.SetClose(-1, () => { UIManager.ReleaseScreen(screen); });
-                    }
-                    CompleteAnimations();
-                    if (isActive) UIManager.UpdateInteractable();
+                        fadeOutScreens.Remove(screen);
+                        UIManager.ReleaseScreen(screen);
+                        UIManager.UpdateInteractable();
+                    });
                 }
             }
         }
@@ -136,8 +143,10 @@ namespace GameTools.UISystem
             {
                 ProcessScreen(screen, ref order);
             }
+
             if (currentScreen != null) ProcessScreen(currentScreen, ref order);
             return;
+
             void ProcessScreen(IContainerItem screen, ref int order)
             {
                 screen.SetOrder(ref order);
@@ -152,7 +161,9 @@ namespace GameTools.UISystem
             {
                 ProcessScreen(fadeOutScreens[i], ref interactable);
             }
+
             return;
+
             void ProcessScreen(IContainerItem item, ref bool interactable)
             {
                 item.SetInteractable(ref interactable);

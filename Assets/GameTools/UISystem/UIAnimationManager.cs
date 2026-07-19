@@ -60,7 +60,7 @@ namespace GameTools.UISystem
             int index = IndexOf(reference);
             if (index == -1) return false;
             var controller = controllers[index];
-            controller.speed += 1 / fadeTime;
+            controller.speed = Mathf.Max(1 / fadeTime, controller.speed);
             controllers[index] = controller;
             return true;
         }
