@@ -85,7 +85,7 @@ namespace GameTools.UISystem
             using (GetBusyScope())
             {
                 if (!screenList.Contains(screen)) throw new ArgumentException($"{screen} is not include in this Group");
-                screen.SetClose(fadeTime, () =>
+                screen.SetClose(fadeTime, callback: () =>
                 {
                     screenList.Remove(screen);
                     UIManager.ReleaseScreen(screen);
@@ -142,7 +142,7 @@ namespace GameTools.UISystem
                     }
                     else
                     { 
-                        screen.SetClose(fadeTime, () =>
+                        screen.SetClose(fadeTime, callback:() =>
                         {
                             screenList.Remove(screen);
                             UIManager.ReleaseScreen(screen);

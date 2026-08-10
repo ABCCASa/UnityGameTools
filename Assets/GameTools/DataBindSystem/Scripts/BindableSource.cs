@@ -92,12 +92,10 @@ namespace GameTools.DataBindSystem
                 Debug.LogError($"{nameof(unbindTarget)}不可以为null");
                 return false;
             }
-
             if (!unbindTarget.isBind) {
                 Debug.LogError($"{unbindTarget}未绑定任何参数");
                 return false;
             }
-
             for (int i = targets.Count - 1; i >= 0; i--)
             {
                 if (targets[i].TryGetTarget(out var element) && IsAliveTarget(element))
@@ -160,7 +158,5 @@ namespace GameTools.DataBindSystem
             }
             return (items.Length ,unbindCount);
         }
-
-       
     }
 }

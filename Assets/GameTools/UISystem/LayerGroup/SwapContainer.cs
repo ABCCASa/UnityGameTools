@@ -30,7 +30,7 @@ namespace GameTools.UISystem
                     ScreenBase closeScreen = currentScreen;
                     currentScreen = null;
                     fadeOutScreens.Add(closeScreen);
-                    closeScreen?.SetClose(fadeTime, () =>
+                    closeScreen?.SetClose(fadeTime, callback:() =>
                     {
                         fadeOutScreens.Remove(closeScreen);
                         UIManager.ReleaseScreen(closeScreen);
@@ -56,7 +56,7 @@ namespace GameTools.UISystem
                 ScreenBase closeScreen = currentScreen;
                 currentScreen = null;
                 fadeOutScreens.Add(closeScreen);
-                closeScreen?.SetClose(fadeTime, () =>
+                closeScreen?.SetClose(fadeTime, callback:() =>
                 {
                     fadeOutScreens.Remove(closeScreen);
                     UIManager.ReleaseScreen(closeScreen);
@@ -126,7 +126,7 @@ namespace GameTools.UISystem
                     var screen = currentScreen;
                     currentScreen = null;
                     fadeOutScreens.Add(screen);
-                    screen?.SetClose(fadeTime, () =>
+                    screen?.SetClose(fadeTime, callback:() =>
                     {
                         fadeOutScreens.Remove(screen);
                         UIManager.ReleaseScreen(screen);
@@ -143,10 +143,8 @@ namespace GameTools.UISystem
             {
                 ProcessScreen(screen, ref order);
             }
-
             if (currentScreen != null) ProcessScreen(currentScreen, ref order);
             return;
-
             void ProcessScreen(IContainerItem screen, ref int order)
             {
                 screen.SetOrder(ref order);
@@ -161,9 +159,7 @@ namespace GameTools.UISystem
             {
                 ProcessScreen(fadeOutScreens[i], ref interactable);
             }
-
             return;
-
             void ProcessScreen(IContainerItem item, ref bool interactable)
             {
                 item.SetInteractable(ref interactable);

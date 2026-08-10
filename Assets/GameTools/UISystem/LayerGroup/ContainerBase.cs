@@ -49,7 +49,5 @@ namespace GameTools.UISystem
                 container.isBusy= false;
             }
         }
-
-        
     }
 }

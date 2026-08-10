@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace GameTools.FiniteStateMachine
 {
@@ -9,9 +8,9 @@ namespace GameTools.FiniteStateMachine
     public abstract class FSMBase<TKey, TEvent> : IRecursiveEventTrigger, IEventTrigger<TEvent>
     {
         public bool isActive { get; private set; }
-        private protected readonly Dictionary<TKey, IState> states = new();
+        private readonly Dictionary<TKey, IState> states = new();
         private readonly Dictionary<TKey, Transition<TKey, TEvent>> transitions = new();
-        private readonly Transition<TKey, TEvent> anyTransitions = new();
+        private readonly Transition<TKey, TEvent> transitionsFromAny = new();
         private readonly bool resumeLastState;
         private readonly TKey enterStateKey;
 
@@ -35,7 +34,7 @@ namespace GameTools.FiniteStateMachine
         /// <summary> 添加条件转换 </summary>
         public void AddConditionTransition(TKey from, TKey to, Func<bool> condition, int priority = 0, bool force = false)
         {
-            if (!transitions.TryGetValue(from, out Transition<TKey, TEvent> t))
+            if (!transitions.TryGetValue(from, out var t))
             {
                 t = new Transition<TKey, TEvent>();
                 transitions[from] = t;
@@ -46,13 +45,13 @@ namespace GameTools.FiniteStateMachine
         /// <summary> 添加条件转换 </summary>
         public void AddConditionTransition(TKey to, Func<bool> condition, int priority = 0, bool allowToSelf = false, bool force = false)
         {
-            anyTransitions.conditionTransitions.Add(to, condition, priority, allowToSelf, force);
+            transitionsFromAny.conditionTransitions.Add(to, condition, priority, allowToSelf, force);
         }
 
         /// <summary> 添加事件转换 </summary>
         public void AddEventTransition(TKey from, TKey to, TEvent eventName, bool force = false)
         {
-            if (!transitions.TryGetValue(from, out Transition<TKey, TEvent> t))
+            if (!transitions.TryGetValue(from, out var t))
             {
                 t = new Transition<TKey, TEvent>();
                 transitions[from] = t;
@@ -63,7 +62,7 @@ namespace GameTools.FiniteStateMachine
         /// <summary> 添加事件转换 </summary>
         public void AddEventTransition(TKey to, TEvent eventName, bool allowToSelf = false, bool force = false)
         {
-            anyTransitions.eventTransitions.Add(to, eventName, allowToSelf, force);
+            transitionsFromAny.eventTransitions.Add(to, eventName, allowToSelf, force);
         }
 
         private bool ChangeState(TKey targetKey)
@@ -87,10 +86,6 @@ namespace GameTools.FiniteStateMachine
             {
                 canExit = progress.canExit;
             }
-            else if(currentState is MonoStateBase mProgress)
-            {
-                canExit = mProgress.canExit;
-            }
             else if (currentState is IRecursiveEventTrigger tirrger)
             {
                 var result = tirrger.RecursiveTrigger(eventName);
@@ -99,10 +94,11 @@ namespace GameTools.FiniteStateMachine
                 receiveCount = result.receiveCount;
             }
             else if (currentState != null) throw new Exception("IState 既不是 State 也不是 FSM");
+            
             if (this is IEventTrigger<T> trigger)
             {
                 receiveCount++;
-                if (trigger.Trigger(eventName, ref canExit)) { triggerCount++; }
+                if (trigger.Trigger(eventName, ref canExit)) triggerCount++;
             }
             return (canExit, receiveCount, triggerCount);
         }
@@ -111,7 +107,7 @@ namespace GameTools.FiniteStateMachine
         bool IEventTrigger<TEvent>.Trigger(TEvent eventName, ref bool canExit)
         {
             var stateKey = currentStateKey;
-            if (anyTransitions.eventTransitions.Check(ref stateKey, canExit, eventName))
+            if (transitionsFromAny.eventTransitions.Check(ref stateKey, canExit, eventName))
             {
                 canExit = ChangeState(stateKey);
                 return true;
@@ -131,7 +127,7 @@ namespace GameTools.FiniteStateMachine
         private bool TryConditionTransition(ref bool canExit)
         {
             var stateKey = currentStateKey;
-            if (anyTransitions.conditionTransitions.Check(ref stateKey, canExit)) 
+            if (transitionsFromAny.conditionTransitions.Check(ref stateKey, canExit)) 
             { 
                 canExit = ChangeState(stateKey);
                 return true;

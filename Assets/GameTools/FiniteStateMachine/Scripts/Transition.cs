@@ -26,13 +26,11 @@ namespace GameTools.FiniteStateMachine
             for (int i = 0; i < conditionTransitions.Count; i++)
             {
                 var (condition, to, allowToSelf, force) = conditionTransitions.Values[i];
-                if (!allowToSelf && EqualityComparer<StateKey>.Default.Equals(state, to)) { continue; }
-                if (!canExit && !force) { continue; }
-                if (condition?.Invoke() ?? true)
-                {
-                    state = to;
-                    return true;
-                }
+                if (!allowToSelf && EqualityComparer<StateKey>.Default.Equals(state, to)) continue;
+                if (!canExit && !force) continue;
+                if (!(condition?.Invoke() ?? true)) continue;
+                state = to;
+                return true;
             }
             return false;
         }
@@ -48,18 +46,11 @@ namespace GameTools.FiniteStateMachine
         }
         public bool Check(ref StateKey state, bool canExit, EventName eventName)
         {
-            if (eventTransitions.TryGetValue(eventName, out var item))
-            {
-                if (item.allowToSelf || !EqualityComparer<StateKey>.Default.Equals(state, item.to))
-                {
-                    if (canExit || item.force)
-                    {
-                        state = item.to;
-                        return true;
-                    }
-                }
-            }
-            return false;
+            if (!eventTransitions.TryGetValue(eventName, out var item)) return false;
+            if (!item.allowToSelf && EqualityComparer<StateKey>.Default.Equals(state, item.to)) return false;
+            if (!canExit && !item.force) return false;
+            state = item.to;
+            return true;
         }
     }
     public class Transition<StateKey, EventName>

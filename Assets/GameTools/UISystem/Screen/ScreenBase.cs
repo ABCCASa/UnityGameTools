@@ -8,22 +8,17 @@ using UnityEngine.UI;
 
 namespace GameTools.UISystem
 {
-    
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Method, AllowMultiple = true)]
     public sealed class AutoBindAttribute : Attribute
     {
         public readonly string path;
-        public AutoBindAttribute(string path)
-        {
-            this.path = path;
-        }
+        public AutoBindAttribute(string path) { this.path = path; }
     }
     
-    public enum ScreenAnimType { Open, Pause, Resume, Close }
     public enum ScreenState { Open, Close, Pause }
 
     [RequireComponent(typeof(Canvas), typeof(CanvasGroup))]
-    public abstract class ScreenBase: MonoBehaviour, IContainerItem 
+    public abstract class ScreenBase: MonoBehaviour, IContainerItem
     {
         internal ScreenBase() { }
         [SerializeField] private Canvas canvas;
@@ -86,7 +81,7 @@ namespace GameTools.UISystem
             Destroy(gameObject);
         }
 
-        internal void SetPause(float fadeTime = -1, Action callback = null)
+        internal void SetPause(float fadeTime = -1, string animKey = null, Action callback = null)
         {
             if (state != ScreenState.Open) throw new InvalidOperationException("cannot pause screen when state is not open");
             CompleteAnimation();
@@ -94,8 +89,8 @@ namespace GameTools.UISystem
             selfInteractable = false;
             SafeCall(OnPause);
             isFade = true;
-            UIAnimationManager.Instance.SetAnimation(this, fadeTime, true,
-                (progress) => Animation(ScreenAnimType.Pause, progress),  
+            UIAnimationManager.Instance.SetAnimation(this, fadeTime, false,
+                (progress) => Animation(animKey, progress),  
                 () =>
                 {
                 isFade = false;
@@ -104,7 +99,7 @@ namespace GameTools.UISystem
                 });
         }
 
-        internal void SetResume(float fadeTime = -1, Action callback = null)
+        internal void SetResume(float fadeTime = -1, string animKey = null, Action callback = null)
         {
             if (state != ScreenState.Pause) throw new InvalidOperationException("cannot resume screen when state is not pause");
             CompleteAnimation();
@@ -113,7 +108,7 @@ namespace GameTools.UISystem
             SafeCall(OnResume);
             isFade = true;
             UIAnimationManager.Instance.SetAnimation(this, fadeTime, true, 
-                (progress) => Animation(ScreenAnimType.Resume, progress), 
+                (progress) => Animation(animKey, progress), 
                 () => 
                 {
                 isFade = false;
@@ -122,7 +117,7 @@ namespace GameTools.UISystem
                 });
         }
 
-        internal void SetClose(float fadeTime = -1, Action callback = null)
+        internal void SetClose(float fadeTime = -1, string animKey = null, Action callback = null)
         {
             if (state == ScreenState.Close) throw new InvalidOperationException("cannot close screen when state is close");
             CompleteAnimation();
@@ -134,8 +129,8 @@ namespace GameTools.UISystem
             if (previousState == ScreenState.Open)
             {
                 isFade = true;
-                UIAnimationManager.Instance.SetAnimation(this, fadeTime, true, 
-                    (progress) => Animation(ScreenAnimType.Close, progress),
+                UIAnimationManager.Instance.SetAnimation(this, fadeTime, false, 
+                    (progress) => Animation(animKey, progress),
                     () =>
                     {
                     isFade = false;
@@ -150,7 +145,7 @@ namespace GameTools.UISystem
             }
         }
 
-        private protected void SetOpen(Action onOpen, float fadeTime, ContainerBase container, Action callback = null)
+        private protected void SetOpen(Action onOpen, float fadeTime, ContainerBase container, string animKey = null, Action callback = null)
         {
             if (state != ScreenState.Close) throw new InvalidOperationException("cannot open screen when state is not close");
             CompleteAnimation();
@@ -160,7 +155,7 @@ namespace GameTools.UISystem
             this.parentContainer = container; // 延后保存container，防止onOpen时尝试打开其他screen(container在这时处于busy状态)
             isFade = true;
             UIAnimationManager.Instance.SetAnimation(this, fadeTime, true,
-                (progress) => Animation(ScreenAnimType.Open, progress), 
+                (progress) => Animation(animKey, progress), 
                 () =>
                 {
                     isFade = false;
@@ -175,16 +170,13 @@ namespace GameTools.UISystem
             catch (Exception e) { Debug.LogException(e, this); }
         }
 
-        protected virtual void Animation(ScreenAnimType animType, float progress)
+        protected virtual void Animation(string animKey, float progress)
         {
-            canvasGroup.alpha = animType switch
-            {
-                ScreenAnimType.Open => progress,
-                ScreenAnimType.Pause => 1,
-                ScreenAnimType.Resume => 1,
-                ScreenAnimType.Close => 1 - progress,
-                _ => throw new ArgumentOutOfRangeException(nameof(animType), animType, null)
-            };
+            float alpha;
+            if (animKey is null or "pauseAll" or "resumeAll" or "open" or "close" )  alpha = progress;
+            else if (animKey is "pause" or "resume") alpha = 1;
+            else throw new ArgumentOutOfRangeException(nameof(animKey), animKey);
+            canvasGroup.alpha = alpha;
         }
 
         void IContainerItem.SetInteractable(ref bool value) => SetInteractable(ref value);

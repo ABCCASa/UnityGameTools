@@ -39,36 +39,7 @@ namespace GameTools.FiniteStateMachine
             isActive = false;
         }
     }
-
-
-    public abstract class MonoStateBase : MonoBehaviour, IState
-    {
-        public bool isActive { get; private set; }
-        internal bool canExit { get; private set; }
-        protected virtual bool OnEnter() { return true; }
-        protected virtual bool OnUpdate() { return true; }
-        protected virtual void OnExit() { }
-        bool IState.Enter()
-        {
-            if (isActive) throw new Exception("State is already active.");
-            isActive = true;
-            canExit = OnEnter();
-            return canExit;
-        }
-        bool IState.Update()
-        {
-            if (!isActive) throw new Exception("State is not active.");
-            canExit = OnUpdate();
-            return canExit;
-        }
-        void IState.Exit()
-        {
-            if (!isActive) throw new Exception("State is not active.");
-            OnExit();
-            isActive = false;
-        }
-    }
-
+    
     public sealed class State : StateBase
     {
         private Func<bool> onEnter, onUpdate;

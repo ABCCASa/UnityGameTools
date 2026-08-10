@@ -15,12 +15,12 @@ namespace GameTools.UISystem
 
         public TScreen Push<TScreen>(float fadeTime = -1) where TScreen : Screen
         {
-            return PushBase<TScreen>(screen => screen.SetOpen(fadeTime, this), fadeTime);
+            return PushBase<TScreen>(screen => screen.SetOpen(fadeTime, this,"open"), fadeTime);
         }
 
         public TScreen Push<TScreen, TParam>(TParam param, float fadeTime = -1) where TScreen : Screen<TParam>
         {
-           return PushBase<TScreen>(screen => screen.SetOpen(param, fadeTime, this), fadeTime);
+           return PushBase<TScreen>(screen => screen.SetOpen(param, fadeTime, this,"open"), fadeTime);
         }
 
         private TScreen PushBase<TScreen>(Action<TScreen> onOpen,float fadeTime = -1) where TScreen : ScreenBase
@@ -29,7 +29,7 @@ namespace GameTools.UISystem
             using (GetBusyScope())
             {
                 ScreenBase pauseScreen = Peek(ScreenState.Open);
-                pauseScreen?.SetPause(fadeTime, UIManager.UpdateInteractable);
+                pauseScreen?.SetPause(fadeTime, "pause", UIManager.UpdateInteractable);
                 var screen = UIManager.GetScreen<TScreen>();
                 screenStack.Add(screen);
                 onOpen.Invoke(screen);
@@ -48,7 +48,7 @@ namespace GameTools.UISystem
                 {
                     ScreenBase closeScreen = Peek(ScreenState.Open);
                     if (closeScreen == null) return;
-                    closeScreen.SetClose(fadeTime, () =>
+                    closeScreen.SetClose(fadeTime, "close", () =>
                     {
                         screenStack.Remove(closeScreen);
                         UIManager.ReleaseScreen(closeScreen);
@@ -56,7 +56,7 @@ namespace GameTools.UISystem
                     });
                     ScreenBase resumeScreen = Peek(ScreenState.Pause);
                     if (resumeScreen == null) return;
-                    resumeScreen.SetResume(fadeTime);
+                    resumeScreen.SetResume(fadeTime, "resume");
                     UIManager.UpdateInteractable();
                 }
             }
@@ -75,7 +75,7 @@ namespace GameTools.UISystem
                 using (GetBusyScope())
                 {
                     Debug.LogWarning($"正在关闭非顶层打开的 Screen: {screen}");
-                    screen.SetClose(-1, () => { UIManager.ReleaseScreen(screen); });
+                    screen.SetClose(-1, "close", () => { UIManager.ReleaseScreen(screen); });
                     screenStack.Remove(screen);
                     UIManager.UpdateInteractable();
                 }
@@ -109,7 +109,7 @@ namespace GameTools.UISystem
                 if (screenStack.Count == 0) return;
                 using (UIManager.GetDelayScope())
                 {
-                    Peek(ScreenState.Open)?.SetPause();
+                    Peek(ScreenState.Open)?.SetPause(animKey: "pauseAll");
                     CompleteAnimations(); // 清理退出一半的Screen
                     UIManager.UpdateOrder();
                     UIManager.UpdateInteractable();
@@ -124,7 +124,7 @@ namespace GameTools.UISystem
                 if (screenStack.Count == 0) return;
                 ScreenBase screen = Peek(ScreenState.Pause);
                 if (screen == null) return;
-                screen.SetResume();
+                screen.SetResume(animKey: "resumeAll");
                 UIManager.UpdateOrder();
                 UIManager.UpdateInteractable();
             }
@@ -147,7 +147,7 @@ namespace GameTools.UISystem
                         }
                         else
                         {
-                            screen.SetClose(fadeTime, () =>
+                            screen.SetClose(fadeTime, "closeAll",() =>
                             {
                                 screenStack.Remove(screen);
                                 UIManager.ReleaseScreen(screen);
