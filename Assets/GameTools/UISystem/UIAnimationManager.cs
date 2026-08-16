@@ -34,6 +34,8 @@ namespace GameTools.UISystem
 
         public void SetAnimation(object reference, float fadeTime, bool forward, Action<float> animation, Action onComplete)
         {
+            animation = SafeCall(animation);
+            onComplete = SafeCall(onComplete);
             CompleteAnimation(reference);
             if (fadeTime <= MinTime)
             {
@@ -79,6 +81,7 @@ namespace GameTools.UISystem
 
         private void LateUpdate()
         {
+            if(controllers.Count == 0) return;
             using (UIManager.GetDelayScope())
             {
                 int currentFrame = Time.frameCount;
@@ -108,5 +111,41 @@ namespace GameTools.UISystem
                 }
             }
         }
+        
+        
+        public Action SafeCall(Action action)
+        {
+            if (action == null) return null;
+            return () =>
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception e)
+                {
+                   Debug.LogException(e);
+                }
+            };
+        }
+
+        public Action<float> SafeCall(Action<float> action)
+        { 
+            if (action == null) return null;
+            return (float value) =>
+            {
+                try
+                {
+                    action(value);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            };
+            
+        }
+
+
     }
 }

@@ -6,49 +6,42 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
+
 namespace GameTools.UISystem
 {
-    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Method, AllowMultiple = true)]
-    public sealed class AutoBindAttribute : Attribute
-    {
-        public readonly string path;
-        public AutoBindAttribute(string path) { this.path = path; }
-    }
-    
     public enum ScreenState { Open, Close, Pause }
-
-    [RequireComponent(typeof(Canvas), typeof(CanvasGroup))]
-    public abstract class ScreenBase: MonoBehaviour, IContainerItem
+    [DisallowMultipleComponent]
+    public abstract class ScreenBase: MonoBehaviour, IContainerItem 
     {
         internal ScreenBase() { }
-        [SerializeField] private Canvas canvas;
-        [SerializeField] private CanvasGroup canvasGroup;
-        private ContainerBase parentContainer;
+        private ScreenContainer parentContainer;
         private bool _globalInteractable, _selfInteractable;
         private bool globalInteractable
         {
             set
             {
                 _globalInteractable = value;
-                canvasGroup.interactable = _globalInteractable && _selfInteractable;
+                SetInteractable(_globalInteractable && _selfInteractable);
             }
         }
-        private protected bool selfInteractable
+
+        private bool selfInteractable
         {
             set
             {
                 _selfInteractable = value;
-                canvasGroup.interactable = _globalInteractable && _selfInteractable;
+                SetInteractable(_globalInteractable && _selfInteractable);
             }
         }
 
+
         public ScreenState state { get; private set; } = ScreenState.Close;
-        public bool isFade { get; private set; }
+        public bool isFade { get; private set; } = false;
         protected abstract bool blockInput { get; }
-        protected virtual bool enableAutoBind => true;
+
 
         protected virtual void OnInit() { }
-        protected virtual void OnClose(ScreenState previousState) { }
+        protected virtual void OnClose() { }
         protected virtual void OnPause() { }
         protected virtual void OnResume() { }
         protected virtual void OnDispose() { }
@@ -69,16 +62,61 @@ namespace GameTools.UISystem
             globalInteractable = false;
             gameObject.SetActive(false); // 默认关闭，所以先要隐藏
             SafeCall(OnInit);
-            if (enableAutoBind) BindInit();
-            bindAction?.Invoke();
         }
 
         internal void SetDispose()
         {
             if (state != ScreenState.Close) throw new InvalidOperationException("cannot dispose a screen when state is not close");
             SafeCall(OnDispose);
-            unbindAction?.Invoke();
             Destroy(gameObject);
+        }
+        
+
+        private protected void SetOpen(Action onOpen, float fadeTime, ScreenContainer container, string animKey = null, Action callback = null)
+        {
+            if (state != ScreenState.Close) throw new InvalidOperationException("cannot open screen when state is not close");
+            CompleteAnimation();
+            state = ScreenState.Open;
+            gameObject.SetActive(true);
+            parentContainer = container; 
+            SafeCall(onOpen);
+            isFade = true;
+            UIAnimationManager.Instance.SetAnimation(this, fadeTime, true,
+                (progress) => Animation(animKey, progress),
+                () =>
+                {
+                    isFade = false;
+                    selfInteractable = true;
+                    callback?.Invoke();
+                });
+        }
+        
+        internal void SetClose(float fadeTime = -1, string animKey = null, Action callback = null)
+        {
+            if (state == ScreenState.Close) throw new InvalidOperationException("cannot close screen when state is close");
+            CompleteAnimation();
+            ScreenState previousState = state;
+            state = ScreenState.Close;
+            selfInteractable = false;
+            SafeCall(OnClose);
+            parentContainer = null;
+            if (previousState == ScreenState.Open)
+            {
+                isFade = true;
+                UIAnimationManager.Instance.SetAnimation(this, fadeTime, false,
+                    (progress) => Animation(animKey, progress),
+                    () =>
+                    {
+                        isFade = false;
+                        gameObject.SetActive(false);
+                        callback?.Invoke();
+                    });
+            }
+            else
+            {
+                gameObject.SetActive(false);
+                callback?.Invoke();
+            }
         }
 
         internal void SetPause(float fadeTime = -1, string animKey = null, Action callback = null)
@@ -90,12 +128,12 @@ namespace GameTools.UISystem
             SafeCall(OnPause);
             isFade = true;
             UIAnimationManager.Instance.SetAnimation(this, fadeTime, false,
-                (progress) => Animation(animKey, progress),  
+                (progress) => Animation(animKey, progress),
                 () =>
                 {
-                isFade = false;
-                gameObject.SetActive(false);
-                callback?.Invoke();
+                    isFade = false;
+                    gameObject.SetActive(false);
+                    callback?.Invoke();
                 });
         }
 
@@ -107,55 +145,8 @@ namespace GameTools.UISystem
             gameObject.SetActive(true);
             SafeCall(OnResume);
             isFade = true;
-            UIAnimationManager.Instance.SetAnimation(this, fadeTime, true, 
-                (progress) => Animation(animKey, progress), 
-                () => 
-                {
-                isFade = false;
-                selfInteractable = true;
-                callback?.Invoke();
-                });
-        }
-
-        internal void SetClose(float fadeTime = -1, string animKey = null, Action callback = null)
-        {
-            if (state == ScreenState.Close) throw new InvalidOperationException("cannot close screen when state is close");
-            CompleteAnimation();
-            parentContainer = null;
-            ScreenState previousState = state;
-            state = ScreenState.Close;
-            selfInteractable = false;
-            SafeCall(()=>OnClose(previousState));
-            if (previousState == ScreenState.Open)
-            {
-                isFade = true;
-                UIAnimationManager.Instance.SetAnimation(this, fadeTime, false, 
-                    (progress) => Animation(animKey, progress),
-                    () =>
-                    {
-                    isFade = false;
-                    gameObject.SetActive(false);
-                    callback?.Invoke();
-                    });
-            }
-            else
-            {
-                gameObject.SetActive(false);
-                callback?.Invoke();
-            }
-        }
-
-        private protected void SetOpen(Action onOpen, float fadeTime, ContainerBase container, string animKey = null, Action callback = null)
-        {
-            if (state != ScreenState.Close) throw new InvalidOperationException("cannot open screen when state is not close");
-            CompleteAnimation();
-            state = ScreenState.Open;
-            gameObject.SetActive(true);
-            SafeCall(onOpen);
-            this.parentContainer = container; // 延后保存container，防止onOpen时尝试打开其他screen(container在这时处于busy状态)
-            isFade = true;
             UIAnimationManager.Instance.SetAnimation(this, fadeTime, true,
-                (progress) => Animation(animKey, progress), 
+                (progress) => Animation(animKey, progress),
                 () =>
                 {
                     isFade = false;
@@ -163,68 +154,60 @@ namespace GameTools.UISystem
                     callback?.Invoke();
                 });
         }
-        
+     
         private void SafeCall(Action action)
         {
-            try { action?.Invoke(); }
-            catch (Exception e) { Debug.LogException(e, this); }
+            try { action?.Invoke();}
+            catch (Exception e) {Debug.LogException(e, this);  }
         }
 
-        protected virtual void Animation(string animKey, float progress)
-        {
-            float alpha;
-            if (animKey is null or "pauseAll" or "resumeAll" or "open" or "close" )  alpha = progress;
-            else if (animKey is "pause" or "resume") alpha = 1;
-            else throw new ArgumentOutOfRangeException(nameof(animKey), animKey);
-            canvasGroup.alpha = alpha;
-        }
-
-        void IContainerItem.SetInteractable(ref bool value) => SetInteractable(ref value);
-        void IContainerItem.SetOrder(ref int order) => SetOrder(ref order);
-
-        private protected virtual void SetInteractable(ref bool value)
+        protected abstract void Animation(string animKey, float progress);
+        protected abstract void SetInteractable(bool value);
+        protected abstract void SetOrder(int order);
+        void IContainerItem.UpdateInteractable(ref bool value)
         {
             if (state != ScreenState.Open && !isFade) return;
             globalInteractable = value;
             if (blockInput) value = false;
         }
 
-        private protected virtual void SetOrder(ref int order)
+        void IContainerItem.UpdateOrder(ref int order)
         {
-            canvas.sortingOrder = order;
+            SetOrder(order);
             order++;
         }
 
-   
-        
         #region 访问Container
-
-        public T OpenScreen<T>(float fadeTime) where T : Screen
+        public T OpenScreen<T>(float fadeTime, string animKey = null, bool addAbove = true, bool relative = false) where T : Screen
         {
-            if (parentContainer != null && parentContainer.isActive)
-            {
-                return parentContainer.Open<T>(fadeTime);
-            }
-            return null;
+            return parentContainer.Open<T>(fadeTime, animKey, addAbove, relative?this:null);
         }
-
-        public TScreen OpenScreen<TScreen, TParam>(TParam param, float fadeTime) where TScreen : Screen<TParam>
+        
+        public TScreen OpenScreen<TScreen, TParam>(TParam param, float fadeTime, string animKey = null, bool addAbove = true, bool relative = false) where TScreen : Screen<TParam>
         {
-            if (parentContainer != null && parentContainer.isActive)
-            {
-                return parentContainer.Open<TScreen, TParam>(param, fadeTime);
-            }
-            return null;
+            return parentContainer.Open<TScreen, TParam>(param, fadeTime, animKey, addAbove, relative?this:null);
         }
+        
+        public void ChangeOrder(bool addAbove = true, ScreenBase relative = null) =>  parentContainer.ChangeOrder(this, addAbove, relative);
 
-        public void Close(float fadeTime)
-        {
-            parentContainer?.Close(this, fadeTime);
-        }
+        public void Pause(float fadeTime = -1, string animKey = null) => parentContainer.Pause(this, fadeTime, animKey);
 
+        public void Resume(float fadeTime = -1, string animKey = null) => parentContainer.Resume(this, fadeTime, animKey);
+        
+        public void Close(float fadeTime, string animKey) => parentContainer.Close(this, fadeTime, animKey);
+        
         #endregion
+        /*#region 绑定系统
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Method, AllowMultiple = true)]
+    protected sealed class AutoBindAttribute : Attribute
+    {
+        public readonly string path;
 
-        #region 绑定系统
+        public AutoBindAttribute(string path)
+        {
+            this.path = path;
+        }
+    }
         protected Transform Find(string path = null)
         {
             return string.IsNullOrEmpty(path) ? transform : transform.Find(path);
@@ -238,9 +221,9 @@ namespace GameTools.UISystem
             return target;
         }
 
-       
 
         private Action bindAction, unbindAction;
+
         protected void RegisterBindAction(Action bindAction, Action unbindAction)
         {
             this.bindAction += bindAction;
@@ -270,6 +253,7 @@ namespace GameTools.UISystem
                             Debug.LogError($"fail to bind with {attr.path}");
                             continue;
                         }
+
                         GameObject obj = Find(path).gameObject;
                         var bind1 = bind;
                         RegisterBindAction(() =>
@@ -301,6 +285,7 @@ namespace GameTools.UISystem
                             Debug.LogError($"fail to bind with {attr.path}");
                             continue;
                         }
+
                         UnityAction action = (UnityAction)Delegate.CreateDelegate(typeof(UnityAction), this, method);
                         RegisterBindAction(
                             () => button.onClick.AddListener(action),
@@ -314,6 +299,7 @@ namespace GameTools.UISystem
                             Debug.LogError("参数带 ref/in/out，无法绑定");
                             continue;
                         }
+
                         if (parameter == typeof(float))
                         {
                             Slider slider = Find<Slider>(attr.path);
@@ -322,6 +308,7 @@ namespace GameTools.UISystem
                                 Debug.LogError($"fail to bind with {attr.path}");
                                 continue;
                             }
+
                             var action = (UnityAction<float>)Delegate.CreateDelegate(typeof(UnityAction<float>), this, method);
                             RegisterBindAction(
                                 () => slider.onValueChanged.AddListener(action),
@@ -331,10 +318,11 @@ namespace GameTools.UISystem
                         {
                             Toggle toggle = Find<Toggle>(attr.path);
                             if (toggle == null)
-                            { 
+                            {
                                 Debug.LogError($"fail to bind with {attr.path}");
                                 continue;
                             }
+
                             var action = (UnityAction<bool>)Delegate.CreateDelegate(typeof(UnityAction<bool>), this, method);
                             RegisterBindAction(
                                 () => toggle.onValueChanged.AddListener(action),
@@ -348,6 +336,7 @@ namespace GameTools.UISystem
                                 Debug.LogError($"fail to bind with {attr.path}");
                                 continue;
                             }
+
                             var action = (UnityAction<string>)Delegate.CreateDelegate(typeof(UnityAction<string>), this, method);
                             RegisterBindAction(
                                 () => inputField.onValueChanged.AddListener(action),
@@ -361,6 +350,7 @@ namespace GameTools.UISystem
                                 Debug.LogError($"fail to bind with {attr.path}");
                                 continue;
                             }
+
                             var action = (UnityAction<int>)Delegate.CreateDelegate(typeof(UnityAction<int>), this, method);
                             RegisterBindAction(
                                 () => dropdown.onValueChanged.AddListener(action),
@@ -373,12 +363,6 @@ namespace GameTools.UISystem
             }
         }
 
-        #endregion
-
-        private void Reset()
-        {
-            canvas = GetComponent<Canvas>();
-            canvasGroup = GetComponent<CanvasGroup>();
-        }
+        #endregion*/
     }
 }

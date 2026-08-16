@@ -4,7 +4,7 @@
     public interface IContainerItem
     {
         /// <summary> 设置item是否可交互 （不影响射线遮挡） </summary>
-        internal void SetInteractable(ref bool value);
-        internal void SetOrder(ref int order);
+        internal void UpdateInteractable(ref bool interactable);
+        internal void UpdateOrder(ref int order);
     }
 }
