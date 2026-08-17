@@ -5,114 +5,157 @@ using UnityEngine;
 
 namespace GameTools.UISystem
 {
+    internal interface IAnimationHandler
+    {
+        public bool isComplete { get; }
+        public void AddCallBack(Action onComplete);
+        public void SpeedUpAnimation(float fadeTime);
+        public void CompleteAnimation();
+    }
+
+
     internal class UIAnimationManager : MonoLazySingleton<UIAnimationManager>
     {
-        private const float MinTime = 1 / 240f;
-        private readonly List<AnimController> controllers = new();
-        private struct AnimController
+        private class AnimationHandler : IAnimationHandler
         {
-            public bool isComplete;
-            public int lastUpdateFrame;
-            public readonly object reference;
-            public readonly bool forward;
-            public float progress;
-            public float speed;
-            public readonly Action<float> animation;
-            public readonly Action onComplete;
-            public AnimController(object reference, float speed, bool forward, Action<float> animation, Action onComplete, int lastUpdateFrame)
-            {
-                progress = 0;
-                this.reference = reference;
-                this.speed = speed;
-                this.forward = forward;
-                this.animation = animation;
-                this.onComplete = onComplete;
-                this.lastUpdateFrame = lastUpdateFrame;
-                isComplete = false;
-            }
-        }
+            private const float MinTime = 1 / 240f;
+            public bool isComplete { get; private set; }
+            private readonly bool forward;
+            private float fadeTime;
+            private float progress = 0f;
+            private int lastUpdateFrame;
+            private Action onComplete;
+            private Action<float> animation;
 
-        public void SetAnimation(object reference, float fadeTime, bool forward, Action<float> animation, Action onComplete)
-        {
-            animation = SafeCall(animation);
-            onComplete = SafeCall(onComplete);
-            CompleteAnimation(reference);
-            if (fadeTime <= MinTime)
+            public AnimationHandler(float fadeTime, bool forward, Action<float> animation, Action onComplete)
             {
+                animation = SafeCall(animation);
+                if (onComplete != null) onComplete = SafeCall(onComplete);
+                this.fadeTime = fadeTime;
+                this.forward = forward;
+                this.onComplete = onComplete;
+                this.animation = animation;
+                if (fadeTime <= MinTime)
+                {
+                    isComplete = true;
+                    animation?.Invoke(forward ? 1 : 0);
+                    onComplete?.Invoke();
+                    return;
+                }
+
+                lastUpdateFrame = Time.frameCount;
+                animation?.Invoke(forward ? 0 : 1);
+            }
+
+            public void AddCallBack(Action onComplete)
+            {
+                if (onComplete == null) return;
+                onComplete = SafeCall(onComplete);
+                if (isComplete) onComplete?.Invoke();
+                else this.onComplete += onComplete;
+            }
+
+            public void SpeedUpAnimation(float fadeTime)
+            {
+                if (isComplete) return;
+                if (fadeTime <= MinTime) CompleteAnimation();
+                if (fadeTime < this.fadeTime) this.fadeTime = fadeTime;
+            }
+
+            public void CompleteAnimation()
+            {
+                if (isComplete) return;
+                isComplete = true;
                 animation?.Invoke(forward ? 1 : 0);
                 onComplete?.Invoke();
-                return;
             }
-            animation?.Invoke(forward ? 0 : 1);
-            AnimController controller = new AnimController(reference, 1 / fadeTime, forward, animation, onComplete, Time.frameCount);
-            controllers.Add(controller);
+
+            public void Update(float deltaTime)
+            {
+                if (isComplete) return;
+                if (lastUpdateFrame == Time.frameCount) return;
+
+                progress += deltaTime / fadeTime;
+                if (progress >= 1)
+                {
+                    isComplete = true;
+                    animation?.Invoke(forward ? 1 : 0);
+                    onComplete?.Invoke();
+                }
+                else
+                {
+                    lastUpdateFrame = Time.frameCount;
+                    animation?.Invoke(forward ? progress : 1 - progress);
+                }
+            }
+
+            private static Action SafeCall(Action action)
+            {
+                if (action == null) return null;
+                return () =>
+                {
+                    try
+                    {
+                        action();
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e);
+                    }
+                };
+            }
+
+            private static Action<float> SafeCall(Action<float> action)
+            {
+                if (action == null) return null;
+                return (float value) =>
+                {
+                    try
+                    {
+                        action(value);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e);
+                    }
+                };
+            }
         }
 
-        private int IndexOf(object reference) => controllers.FindIndex(x => x.reference == reference && !x.isComplete);
-        
-        public bool HasAnimation(object reference)
+        private const float MinTime = 1 / 240f;
+        private readonly List<AnimationHandler> handlerList = new();
+        public IAnimationHandler SetAnimation(float fadeTime, bool forward, Action<float> animation, Action onComplete = null)
         {
-            int index = IndexOf(reference);
-            return index >= 0;
+            var handler = new AnimationHandler(fadeTime, forward, animation, onComplete);
+            if (!handler.isComplete) handlerList.Add(handler);
+            return handler;
         }
 
-        public bool SpeedUpAnimation(object reference, float fadeTime)
-        {
-            if (fadeTime <= MinTime) return CompleteAnimation(reference);
-            int index = IndexOf(reference);
-            if (index == -1) return false;
-            var controller = controllers[index];
-            controller.speed = Mathf.Max(1 / fadeTime, controller.speed);
-            controllers[index] = controller;
-            return true;
-        }
-
-        public bool CompleteAnimation(object reference)
-        {
-            int index = IndexOf(reference);
-            if (index == -1) return false;
-            var controller = controllers[index];
-            controller.isComplete = true;
-            controllers[index] = controller;
-            controller.animation?.Invoke(controller.forward ? 1 : 0);
-            controller.onComplete?.Invoke();
-            return true;
-        }
 
         private void LateUpdate()
         {
-            if(controllers.Count == 0) return;
-            using (UIManager.GetDelayScope())
+            if (handlerList.Count == 0) return;
+            using (LayerManager.GetDelayScope())
             {
-                int currentFrame = Time.frameCount;
-                for (int i = controllers.Count - 1; i >= 0; i--)
+                for (int i = handlerList.Count - 1; i >= 0; i--)
                 {
-                    var controller = controllers[i];
-                    if (controller.isComplete)
+                    var handler = handlerList[i];
+                    if (handler.isComplete)
                     {
-                        controllers.RemoveAt(i);
+                        handlerList.RemoveAt(i);
                         continue;
                     }
-                    if (controller.lastUpdateFrame >= currentFrame) continue;
-                    controller.progress += Time.unscaledDeltaTime * controller.speed;
-                    if (controller.progress >= 1)
+
+                    handler.Update(Time.unscaledDeltaTime);
+                    if (handler.isComplete)
                     {
-                        controllers.RemoveAt(i);
-                        controller.animation?.Invoke(controller.forward ? 1 : 0);
-                        controller.onComplete?.Invoke();
-                    }
-                    else
-                    {
-                        controller.lastUpdateFrame = currentFrame;
-                        controllers[i] = controller;
-                        float p = controller.progress;
-                        controller.animation?.Invoke(controller.forward ? p : 1 - p);
+                        handlerList.RemoveAt(i);
                     }
                 }
             }
         }
-        
-        
+
+
         public Action SafeCall(Action action)
         {
             if (action == null) return null;
@@ -124,13 +167,13 @@ namespace GameTools.UISystem
                 }
                 catch (Exception e)
                 {
-                   Debug.LogException(e);
+                    Debug.LogException(e);
                 }
             };
         }
 
         public Action<float> SafeCall(Action<float> action)
-        { 
+        {
             if (action == null) return null;
             return (float value) =>
             {
@@ -143,9 +186,6 @@ namespace GameTools.UISystem
                     Debug.LogException(e);
                 }
             };
-            
         }
-
-
     }
 }

@@ -21,7 +21,6 @@ namespace GameTools.UISystem
         public int count => screenList.Count;
         public bool isBusy { get; private set; } = false;
         public bool isActive { get; private set; } = true;
-        
         internal ScreenContainer(IScreenLoader screenLoader = null)
         {
             this.screenLoader = screenLoader ?? ResourcesScreenLoader.Instance;
@@ -93,8 +92,8 @@ namespace GameTools.UISystem
                     screenList.Insert(addAbove ? index + 1 : index, runtimeScreen);
                 }
                 openAction.Invoke(screen);
-                UIManager.UpdateInteractable();
-                UIManager.UpdateOrder();
+                LayerManager.UpdateInteractable();
+                LayerManager.UpdateOrder();
                 return screen;
             }
         }
@@ -115,7 +114,7 @@ namespace GameTools.UISystem
             {
                 RuntimeScreen runtimeScreen = GetRuntimeScreen(screen);
                 if(runtimeScreen == null) throw new ArgumentException($"{screen} is not include in this Group");
-                if(isActive) screen.SetPause(fadeTime, animKey, UIManager.UpdateInteractable);
+                if(isActive) screen.SetPause(fadeTime, animKey, LayerManager.UpdateInteractable);
                 else if (runtimeScreen.isSelfPause) throw new InvalidOperationException("cannot pause screen when state is not open"); 
                 runtimeScreen.isSelfPause = true;
             }
@@ -130,8 +129,8 @@ namespace GameTools.UISystem
                 if (isActive)
                 {
                     screen.SetResume(fadeTime, animKey);
-                    UIManager.UpdateInteractable();
-                    UIManager.UpdateOrder(); 
+                    LayerManager.UpdateInteractable();
+                    LayerManager.UpdateOrder(); 
                 }
                 else if (!runtimeScreen.isSelfPause) throw new InvalidOperationException("cannot resume screen when state is not pause");
                 runtimeScreen.isSelfPause = false;
@@ -148,7 +147,7 @@ namespace GameTools.UISystem
                 {
                     screenList.Remove(runtimeScreen);
                     screenLoader.ReleaseScreen(screen);
-                    UIManager.UpdateInteractable();
+                    LayerManager.UpdateInteractable();
                 });
             }
         }
@@ -181,8 +180,8 @@ namespace GameTools.UISystem
                     int index = IndexOf(relative);
                     screenList.Insert(addAbove ? index + 1 : index, runtimeTarget);
                 }
-                UIManager.UpdateInteractable();
-                UIManager.UpdateOrder();
+                LayerManager.UpdateInteractable();
+                LayerManager.UpdateOrder();
             }
         }
         
@@ -202,15 +201,15 @@ namespace GameTools.UISystem
                     if(runtimeScreen.isSelfPause) continue;
                     screen.SetResume();
                 }
-                UIManager.UpdateInteractable();
-                UIManager.UpdateOrder();
+                LayerManager.UpdateInteractable();
+                LayerManager.UpdateOrder();
             }
         }
 
 
         public void SetInactive()
         {
-            using (UIManager.GetDelayScope())
+            using (LayerManager.GetDelayScope())
             using (GetBusyScope())
             {
                 if(!isActive) throw new InvalidOperationException($"{this} is not active");
@@ -218,7 +217,7 @@ namespace GameTools.UISystem
                 for (int i = screenList.Count - 1; i >= 0; i--)
                 {
                     ScreenBase screen = screenList[i].screen;
-                    if (screen.state == ScreenState.Open) screen.SetPause(callback: UIManager.UpdateInteractable);
+                    if (screen.state == ScreenState.Open) screen.SetPause(callback: LayerManager.UpdateInteractable);
                     else if (screen.isFade) screen.CompleteAnimation();
                 }
             }
@@ -242,7 +241,7 @@ namespace GameTools.UISystem
                         {
                             screenList.Remove(runtimeScreen);
                             screenLoader.ReleaseScreen(screen);
-                            UIManager.UpdateInteractable();
+                            LayerManager.UpdateInteractable();
                         });
                     }
                 }

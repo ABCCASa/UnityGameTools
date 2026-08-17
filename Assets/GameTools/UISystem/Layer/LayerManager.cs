@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GameTools.UISystem
 {
-    public static partial class UIManager
+    public static class LayerManager
     {
         private struct Layer 
         {
@@ -41,9 +41,10 @@ namespace GameTools.UISystem
 
         internal static void RemoveContainer(ScreenContainer container)
         {
-            if(container.count != 0) throw new ArgumentException($"{container} is not empty"); 
+           
             int index = layers.FindLastIndex(item => item.container == container);
             if(index == -1) throw new ArgumentException($"container: {container} does not exist");
+            if(container.count != 0) throw new ArgumentException($"{container} is not empty"); 
             layers.RemoveAt(index);
         }
 
