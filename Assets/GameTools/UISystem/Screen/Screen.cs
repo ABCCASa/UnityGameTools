@@ -1,7 +1,4 @@
-﻿using System;
-using UnityEngine;
-
-namespace GameTools.UISystem
+﻿namespace GameTools.UISystem
 {
     public abstract class Screen: ScreenBase 
     {

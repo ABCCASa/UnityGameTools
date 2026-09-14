@@ -1,29 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
-using NUnit.Framework;
 using UnityEngine;
 
 namespace GameTools.UISystem
 {
     internal class RegistryScreenLoader: IScreenLoader
     {
-
         private class ScreenResource
         {
-            public bool isUsed =false;
+            public bool isUsed;
             public readonly ScreenBase screen;
-
             public ScreenResource(ScreenBase screen)
             {
                 this.screen = screen;
             }
         }
-
         
-
-
-
-        private Dictionary<Type,  ScreenResource> screenDict = new();
+        private Dictionary<Type, ScreenResource> screenDict = new();
         public void RegisterScreen(ScreenBase screen) 
         {
             if(screen == null) throw new ArgumentNullException($"{nameof(screen)} must not be null.");

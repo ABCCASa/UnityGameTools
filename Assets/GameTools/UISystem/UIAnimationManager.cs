@@ -13,38 +13,39 @@ namespace GameTools.UISystem
         public void CompleteAnimation();
     }
 
-
     internal class UIAnimationManager : MonoLazySingleton<UIAnimationManager>
     {
         private class AnimationHandler : IAnimationHandler
         {
-            private const float MinTime = 1 / 240f;
+            private const float MinTime = 1 / 120f;
             public bool isComplete { get; private set; }
             private readonly bool forward;
             private float fadeTime;
-            private float progress = 0f;
+            private float progress;
             private int lastUpdateFrame;
+            private readonly Action<float> animation;
             private Action onComplete;
-            private Action<float> animation;
 
-            public AnimationHandler(float fadeTime, bool forward, Action<float> animation, Action onComplete)
+            private AnimationHandler(float fadeTime, bool forward, Action<float> animation, Action onComplete)
             {
-                animation = SafeCall(animation);
-                if (onComplete != null) onComplete = SafeCall(onComplete);
-                this.fadeTime = fadeTime;
+                isComplete = false;
                 this.forward = forward;
-                this.onComplete = onComplete;
+                this.fadeTime = fadeTime;
+                progress = 0;
                 this.animation = animation;
-                if (fadeTime <= MinTime)
-                {
-                    isComplete = true;
-                    animation?.Invoke(forward ? 1 : 0);
-                    onComplete?.Invoke();
-                    return;
-                }
-
-                lastUpdateFrame = Time.frameCount;
+                this.onComplete = onComplete;
                 animation?.Invoke(forward ? 0 : 1);
+                lastUpdateFrame = Time.frameCount; 
+            }
+
+            public static AnimationHandler Create(float fadeTime, bool forward, Action<float> animation, Action onComplete)
+            {
+                onComplete = SafeCall(onComplete);
+                animation = SafeCall(animation);
+                if (fadeTime > MinTime) return new AnimationHandler(fadeTime, forward, animation, onComplete);
+                animation?.Invoke(forward ? 1 : 0);
+                onComplete?.Invoke();
+                return null;
             }
 
             public void AddCallBack(Action onComplete)
@@ -58,7 +59,11 @@ namespace GameTools.UISystem
             public void SpeedUpAnimation(float fadeTime)
             {
                 if (isComplete) return;
-                if (fadeTime <= MinTime) CompleteAnimation();
+                if (fadeTime <= MinTime)
+                {
+                    CompleteAnimation();
+                    return;
+                }
                 if (fadeTime < this.fadeTime) this.fadeTime = fadeTime;
             }
 
@@ -74,7 +79,6 @@ namespace GameTools.UISystem
             {
                 if (isComplete) return;
                 if (lastUpdateFrame == Time.frameCount) return;
-
                 progress += deltaTime / fadeTime;
                 if (progress >= 1)
                 {
@@ -108,7 +112,7 @@ namespace GameTools.UISystem
             private static Action<float> SafeCall(Action<float> action)
             {
                 if (action == null) return null;
-                return (float value) =>
+                return (value) =>
                 {
                     try
                     {
@@ -122,15 +126,13 @@ namespace GameTools.UISystem
             }
         }
 
-        private const float MinTime = 1 / 240f;
         private readonly List<AnimationHandler> handlerList = new();
-        public IAnimationHandler SetAnimation(float fadeTime, bool forward, Action<float> animation, Action onComplete = null)
+        public IAnimationHandler RegisterAnimation(float fadeTime, bool forward, Action<float> animation, Action onComplete = null)
         {
-            var handler = new AnimationHandler(fadeTime, forward, animation, onComplete);
-            if (!handler.isComplete) handlerList.Add(handler);
+            var handler = AnimationHandler.Create(fadeTime, forward, animation, onComplete);
+            if (handler != null)  handlerList.Add(handler);  
             return handler;
         }
-
 
         private void LateUpdate()
         {
@@ -145,7 +147,6 @@ namespace GameTools.UISystem
                         handlerList.RemoveAt(i);
                         continue;
                     }
-
                     handler.Update(Time.unscaledDeltaTime);
                     if (handler.isComplete)
                     {
@@ -153,39 +154,6 @@ namespace GameTools.UISystem
                     }
                 }
             }
-        }
-
-
-        public Action SafeCall(Action action)
-        {
-            if (action == null) return null;
-            return () =>
-            {
-                try
-                {
-                    action();
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
-                }
-            };
-        }
-
-        public Action<float> SafeCall(Action<float> action)
-        {
-            if (action == null) return null;
-            return (float value) =>
-            {
-                try
-                {
-                    action(value);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
-                }
-            };
         }
     }
 }

@@ -3,7 +3,7 @@
     /// <summary> 控制层级关系 </summary>
     public interface IContainerItem
     {
-        /// <summary> 设置item是否可交互 （不影响射线遮挡） </summary>
+        /// <summary> 设置item是否可交互（不影响射线遮挡）</summary>
         internal void UpdateInteractable(ref bool interactable);
         internal void UpdateOrder(ref int order);
     }

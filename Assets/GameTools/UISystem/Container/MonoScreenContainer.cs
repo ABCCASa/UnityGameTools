@@ -1,5 +1,5 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
+
 namespace GameTools.UISystem
 {
     public class MonoScreenContainer: MonoBehaviour
@@ -13,7 +13,7 @@ namespace GameTools.UISystem
         {
             get
             {
-                if(!isInitialized) Initialize();
+               Initialize();
                 return _screenContainer;
             }
         }
@@ -22,16 +22,14 @@ namespace GameTools.UISystem
         {
             if(isInitialized) return;
             isInitialized = true;
-            _screenContainer = new ScreenContainer(loader);
             for (int i = 0; i < transform.childCount; i++)
             {
                 Transform child = transform.GetChild(i);
                 var screen = child.GetComponent<ScreenBase>();
                 if (screen != null) { loader.RegisterScreen(screen); }
             }
-            LayerManager.AddContainer(_screenContainer, layerOrder);
+            _screenContainer = LayerManager.AddContainer<ScreenContainer>(layerOrder, screenLoader: loader);
         }
-
 
         private void Awake()
         {
@@ -41,9 +39,7 @@ namespace GameTools.UISystem
         private void OnDestroy()
         {
             if (_screenContainer == null) return;
-            _screenContainer.CloseAll();
-            loader.Dispose();
-            LayerManager.RemoveContainer(screenContainer);
+            LayerManager.RemoveContainer(_screenContainer);
         }
     }
 }

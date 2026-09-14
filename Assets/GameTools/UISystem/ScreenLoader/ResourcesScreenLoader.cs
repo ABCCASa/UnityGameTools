@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using GameTools.Singletons;
 using UnityEngine;
-using UnityEngine.Pool;
-using Object = UnityEngine.Object;
 
 namespace GameTools.UISystem
 {
@@ -13,14 +11,14 @@ namespace GameTools.UISystem
         private DynamicObjectPool<ScreenBase> GetPool(Type type)
         {
             if (screenPools.TryGetValue(type, out var pool)) return pool;
-            string path = $"UI/Screens/{type.Name}";;
+            string path = $"UI/Screens/{type.Name}";
             pool = new DynamicObjectPool<ScreenBase> (
                 createFunc: () =>
                 {
                     ScreenBase original = Resources.Load<ScreenBase>(path);
                     if (original == null) throw new Exception($"Cannot find the ui based in path({path})");
                     if(original.GetType() != type) throw new Exception($"{type} is a base type of the instance, not its concrete runtime type. Actual type: {original.GetType()}.");
-                    ScreenBase ui = Object.Instantiate(original, transform);
+                    ScreenBase ui = Instantiate(original, transform);
                     ui.gameObject.name = original.gameObject.name;
                     ui.SetInit();
                     return ui;
@@ -41,6 +39,7 @@ namespace GameTools.UISystem
             T ui = (T)pool.Get();
             return ui;
         }
+        
         public void ReleaseScreen(ScreenBase screen)
         {
             if (screen == null) throw new Exception("screen为null");
@@ -56,16 +55,22 @@ namespace GameTools.UISystem
             }
         }
         
-        private float deltaTime = 0;
+        private float deltaTime;
         public void LateUpdate()
         {
             deltaTime += Time.unscaledDeltaTime;
-            if (Time.frameCount % 30 != 0) return; // 减少更新次数，大概30秒更新一次
+            if (Time.frameCount % 30 != 0) return; // 减少更新次数
             foreach (var pool in screenPools.Values)
             {
                 pool.Update(deltaTime);
             }
             deltaTime = 0;
         }
+
+        public void Dispose()
+        {
+            //do nothing, because this loader is singleton, it is shared between multiple container
+        }
+
     }
 }

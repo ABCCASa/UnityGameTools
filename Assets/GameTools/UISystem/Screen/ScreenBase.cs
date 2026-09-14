@@ -2,38 +2,18 @@
 using UnityEngine;
 using UnityEngine.Assertions;
 
-
 namespace GameTools.UISystem
 {
-    public class TransitionHandler
+    internal class StateVersion
     {
-        public ScreenState state;
-        public float fadeTime;
-        public TransitionHandler(ScreenState state, float fadeTime)
-        {
-            this.state = state;
-            this.fadeTime = fadeTime;
-        }
+        public int version { get; private set; }
+        public int nextVersion => ++ version;
     }
 
-    public class TransitionVersion
-    {
-        private int version = 0;
-        public int GetVersion()
-        {
-            version++;
-            return version;;
-        }
-        public bool ValidVersion(int version)
-        {
-            return this.version == version;
-        }
-    }
-
-
-    public enum ScreenState { Uninitialize, Open, Close, Pause, Dispose }
+    public enum ScreenState { Init, Open, Close, Pause, Dispose }
+  
     [DisallowMultipleComponent]
-    public abstract class ScreenBase: MonoBehaviour, IContainerItem 
+    public abstract class ScreenBase: MonoBehaviour, IContainerItem
     {
         internal ScreenBase() { }
         private ScreenContainer parentContainer;
@@ -46,7 +26,7 @@ namespace GameTools.UISystem
                 SetInteractable(_globalInteractable && _selfInteractable);
             }
         }
-
+        
         private bool selfInteractable
         {
             set
@@ -55,9 +35,9 @@ namespace GameTools.UISystem
                 SetInteractable(_globalInteractable && _selfInteractable);
             }
         }
-        public ScreenState state { get; private set; } = ScreenState.Uninitialize;
+        
+        public ScreenState state { get; private set; } = ScreenState.Init;
         private IAnimationHandler _animationHandler;
-
         private IAnimationHandler animationHandler
         {
             get
@@ -72,7 +52,8 @@ namespace GameTools.UISystem
                 else _animationHandler = value;
             }
         }
-        private readonly TransitionVersion transitionVersion = new();
+        
+        private readonly StateVersion stateVersion = new();
         public bool isFade => animationHandler != null;
         public abstract bool blockInput { get; }
 
@@ -85,6 +66,7 @@ namespace GameTools.UISystem
         public void CompleteAnimation()
         {
             animationHandler?.CompleteAnimation();
+            animationHandler = null;
         }
         
         public void SpeedUpAnimation(float fadeTime)
@@ -94,11 +76,11 @@ namespace GameTools.UISystem
 
         internal void SetInit()
         {  
-            if (state != ScreenState.Uninitialize) throw new InvalidOperationException("cannot dispose a screen when state is not close");
+            if (state != ScreenState.Init) throw new InvalidOperationException("cannot dispose a screen when state is not close");
             state = ScreenState.Close;
             selfInteractable = false;
             globalInteractable = false;
-            gameObject.SetActive(false); // 默认关闭，所以先要隐藏
+            gameObject.SetActive(false);
             SafeCall(OnInit);
         }
 
@@ -115,44 +97,42 @@ namespace GameTools.UISystem
         {
             CompleteAnimation();
             if (state != ScreenState.Close) throw new InvalidOperationException("cannot open screen when state is not close");
-            int version = transitionVersion.GetVersion();
+            int version = stateVersion.nextVersion;
             state = ScreenState.Open;
             gameObject.SetActive(true);
             parentContainer = container; 
-            animationHandler = UIAnimationManager.Instance.SetAnimation( fadeTime, true, (progress) => Animation(animKey, progress));
             SafeCall(onOpen);
-            if(!transitionVersion.ValidVersion(version)) return; 
-            if (isFade)animationHandler.AddCallBack( () => selfInteractable = true);
-            else selfInteractable = true;
+            if (stateVersion.version != version) return; 
+            animationHandler = UIAnimationManager.Instance.RegisterAnimation(fadeTime, true, 
+                (progress) => OnAnimation(animKey, progress),
+                () => selfInteractable = true);
         }
         
         internal void SetClose(float fadeTime = -1, string animKey = null, Action callback = null)
         {
             CompleteAnimation();
-            if (state != ScreenState.Open || state != ScreenState.Pause) throw new InvalidOperationException("cannot close screen when state is close");
-            int version = transitionVersion.GetVersion();
+            if (state != ScreenState.Open && state != ScreenState.Pause) throw new InvalidOperationException("cannot close screen when state is close");
+            int version = stateVersion.nextVersion;
             ScreenState previousState = state;
             state = ScreenState.Close;
             selfInteractable = false;
+            SafeCall(OnClose);
+            parentContainer = null;
+            if (stateVersion.version != version) return;
             if (previousState == ScreenState.Open)
             {
-               animationHandler = UIAnimationManager.Instance.SetAnimation(fadeTime, false, (progress) => Animation(animKey, progress));
-            }
-            SafeCall(OnClose);
-            if(!transitionVersion.ValidVersion(version)) return;
-            parentContainer = null;
-            if (isFade)
-            {
-                animationHandler.AddCallBack(() =>
-                {
-                    gameObject.SetActive(false);
-                    callback?.Invoke(); 
-                });
-            }
+                animationHandler = UIAnimationManager.Instance.RegisterAnimation(fadeTime, false, 
+                    (progress) => OnAnimation(animKey, progress),
+                    () =>
+                    {
+                        gameObject.SetActive(false);
+                        callback?.Invoke(); 
+                    });
+            } 
             else
             {
                 gameObject.SetActive(false);
-                callback?.Invoke(); 
+                SafeCall(callback);
             }
         }
 
@@ -160,50 +140,44 @@ namespace GameTools.UISystem
         {
             CompleteAnimation();
             if (state != ScreenState.Open) throw new InvalidOperationException("cannot pause screen when state is not open");
-            int version = transitionVersion.GetVersion();
+            int version = stateVersion.nextVersion;
             state = ScreenState.Pause;
             selfInteractable = false;
-            animationHandler = UIAnimationManager.Instance.SetAnimation(fadeTime, false, (progress) => Animation(animKey, progress));
             SafeCall(OnPause);
-            if(!transitionVersion.ValidVersion(version)) return; 
-            if (isFade)
-            {
-                animationHandler.AddCallBack(() =>
+            if(stateVersion.version != version) return; 
+            animationHandler = UIAnimationManager.Instance.RegisterAnimation(fadeTime, false, 
+                (progress) => OnAnimation(animKey, progress),
+                () =>
                 {
                     gameObject.SetActive(false);
                     callback?.Invoke(); 
                 });
-            }
-            else
-            {
-                gameObject.SetActive(false);
-                callback?.Invoke(); 
-            }
         }
 
         internal void SetResume(float fadeTime = -1, string animKey = null)
         {
             CompleteAnimation();
             if (state != ScreenState.Pause) throw new InvalidOperationException("cannot resume screen when state is not pause");
-            int version = transitionVersion.GetVersion();
+            int version = stateVersion.nextVersion;
             state = ScreenState.Open;
             gameObject.SetActive(true);
-            animationHandler = UIAnimationManager.Instance.SetAnimation(fadeTime, true, (progress) => Animation(animKey, progress));
             SafeCall(OnResume);
-            if(!transitionVersion.ValidVersion(version)) return; 
-            if (isFade) animationHandler.AddCallBack(() => selfInteractable = true);
-            else selfInteractable = true;
+            if(stateVersion.version != version) return; 
+            animationHandler = UIAnimationManager.Instance.RegisterAnimation(fadeTime, true, 
+                (progress) => OnAnimation(animKey, progress),
+                () => selfInteractable = true);
         }
      
         private void SafeCall(Action action)
         {
-            try { action?.Invoke();}
-            catch (Exception e) {Debug.LogException(e, this);  }
+            try { action?.Invoke(); }
+            catch (Exception e) { Debug.LogException(e, this); }
         }
 
-        protected abstract void Animation(string animKey, float progress);
+        protected abstract void OnAnimation(string animKey, float progress);
         protected abstract void SetInteractable(bool value);
         protected abstract void SetOrder(int order);
+        
         void IContainerItem.UpdateInteractable(ref bool value)
         {
             if (state != ScreenState.Open && !isFade) return;
@@ -235,7 +209,6 @@ namespace GameTools.UISystem
         public void Resume(float fadeTime = -1, string animKey = null) => parentContainer.Resume(this, fadeTime, animKey);
         
         public void Close(float fadeTime, string animKey) => parentContainer.Close(this, fadeTime, animKey);
-        
         #endregion
     }
 }
