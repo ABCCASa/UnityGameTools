@@ -22,13 +22,13 @@ namespace GameTools.UISystem
         {
             if(isInitialized) return;
             isInitialized = true;
+            _screenContainer = LayerManager.AddContainer<ScreenContainer>(layerOrder, screenLoader: loader);
             for (int i = 0; i < transform.childCount; i++)
             {
                 Transform child = transform.GetChild(i);
                 var screen = child.GetComponent<ScreenBase>();
                 if (screen != null) { loader.RegisterScreen(screen); }
             }
-            _screenContainer = LayerManager.AddContainer<ScreenContainer>(layerOrder, screenLoader: loader);
         }
 
         private void Awake()
