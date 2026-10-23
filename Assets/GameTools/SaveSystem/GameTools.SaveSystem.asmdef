@@ -1,0 +1,18 @@
+{
+    "name": "GameTools.SaveSystem",
+    "rootNamespace": "",
+    "references": [
+        "GUID:c85725a12eaba9548b8d223f3346d793",
+        "GUID:2765e68924a08a94ea0ea66b31c0168f",
+        "GUID:1d8180323b9c4cd44a8d3ef81ada5306"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
