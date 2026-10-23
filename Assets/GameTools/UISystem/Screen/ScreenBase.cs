@@ -48,14 +48,13 @@ namespace GameTools.UISystem
             set
             {
                 Assert.IsTrue(_animationHandler?.isComplete ?? true); // 动画被替换时已经完成
-                if (value != null && value.isComplete) _animationHandler = null;
-                else _animationHandler = value;
+                _animationHandler = null;
+                if (value != null && !value.isComplete) _animationHandler = value;
             }
         }
-        
         private readonly StateVersion stateVersion = new();
         public bool isFade => animationHandler != null;
-        public abstract bool blockInput { get; }
+        protected abstract bool blockInput { get; }
 
         protected virtual void OnInit() { }
         protected virtual void OnClose() { }
@@ -81,14 +80,19 @@ namespace GameTools.UISystem
             selfInteractable = false;
             globalInteractable = false;
             gameObject.SetActive(false);
+            SafeCall(OnBeforeInit);
             SafeCall(OnInit);
         }
+
+        private protected virtual void OnBeforeInit() {  }
+        private protected virtual void OnBeforeDispose() { }
 
         internal void SetDispose()
         {
             CompleteAnimation();
             if (state != ScreenState.Close) throw new InvalidOperationException("cannot dispose a screen when state is not close");
             state = ScreenState.Dispose;
+            SafeCall(OnBeforeDispose);
             SafeCall(OnDispose);
             Destroy(gameObject);
         }
@@ -175,8 +179,8 @@ namespace GameTools.UISystem
         }
 
         protected abstract void OnAnimation(string animKey, float progress);
-        protected abstract void SetInteractable(bool value);
-        protected abstract void SetOrder(int order);
+        private protected abstract void SetInteractable(bool value);
+        private  protected abstract void SetOrder(int order);
         
         void IContainerItem.UpdateInteractable(ref bool value)
         {
@@ -192,12 +196,12 @@ namespace GameTools.UISystem
         }
 
         #region 访问Container
-        public T OpenScreen<T>(float fadeTime, string animKey = null, bool addAbove = true, bool relative = false) where T : Screen
+        public T OpenScreen<T>(float fadeTime, string animKey = null, bool addAbove = true, bool relative = false) where T : UGUIScreen
         {
             return parentContainer.Open<T>(fadeTime, animKey, addAbove, relative?this:null);
         }
         
-        public TScreen OpenScreen<TScreen, TParam>(TParam param, float fadeTime, string animKey = null, bool addAbove = true, bool relative = false) where TScreen : Screen<TParam>
+        public TScreen OpenScreen<TScreen, TParam>(TParam param, float fadeTime, string animKey = null, bool addAbove = true, bool relative = false) where TScreen : UGUIScreen<TParam>
         {
             return parentContainer.Open<TScreen, TParam>(param, fadeTime, animKey, addAbove, relative?this:null);
         }
@@ -208,7 +212,7 @@ namespace GameTools.UISystem
 
         public void Resume(float fadeTime = -1, string animKey = null) => parentContainer.Resume(this, fadeTime, animKey);
         
-        public void Close(float fadeTime, string animKey) => parentContainer.Close(this, fadeTime, animKey);
+        public void Close(float fadeTime = -1, string animKey = null) => parentContainer.Close(this, fadeTime, animKey);
         #endregion
     }
 }

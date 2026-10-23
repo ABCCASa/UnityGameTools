@@ -22,7 +22,6 @@ namespace GameTools.UISystem
         }
 
         private static readonly List<Layer> layers = new();
-
         public static TContainer AddContainer<TContainer>(int layerOrder, string name = null, IScreenLoader screenLoader = null) where TContainer : ContainerBase, new()
         {
             if (name != null && layers.Exists(x => x.name == name)) throw new ArgumentException($"name: {name} already exists");

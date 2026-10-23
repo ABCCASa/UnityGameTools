@@ -3,7 +3,6 @@ namespace GameTools.Singletons
 {
     /// <summary> 不会被自动创建，需要通过AddComponent等方式手动创建，之后可通过Instance获取
     /// 场景中只存在一个，多余的会被销毁，基于定义的销毁规则</summary>
-    /// <typeparam name="T"></typeparam>
     [DisallowMultipleComponent]
     public abstract class MonoManualSingleton<T> : MonoBehaviour where T : MonoManualSingleton<T>
     {
@@ -18,23 +17,17 @@ namespace GameTools.Singletons
         {
             get
             {
-                if (_instance == null) { _instance = null; }  // m_instance 销毁后，比较null为true，但依然存在所以要清空
+                if (_instance == null) _instance = null; // m_instance 销毁后，比较null为true，但依然存在所以要清空
                 return _instance;
             }
-            private set
-            {
-                _instance = value;
-            }
+            private set => _instance = value;
         }
+        
         protected virtual void Awake()
         {
             if (Instance != null)
             {
-                if (Instance.allowReplace != allowReplace)
-                {
-                    Debug.LogWarning($" {typeof(T).FullName} 单例类，的替换规则未达成统一，以当前正在使用的单例为准");
-                }
-
+                if (Instance.allowReplace != allowReplace) Debug.LogWarning($"{typeof(T).FullName} 单例类，的替换规则未达成统一，以当前正在使用的单例为准");
                 if (Instance.allowReplace)
                 {
                     Debug.Log($"发现重复的 {typeof(T).FullName} 单例类，按照替换规则，将单例更新为新生成的");
@@ -52,26 +45,14 @@ namespace GameTools.Singletons
 
         private void DestroySingleton()
         {
-            if (Instance == this)
-            {
-                Instance = null;
-            }
-            if (onlyDestroyClass)
-            {
-                Destroy(this);
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
+            if (Instance == this) Instance = null;
+            if (onlyDestroyClass) Destroy(this);
+            else Destroy(gameObject);
         }
 
         protected virtual void OnDestroy()
         {
-            if (Instance == this)
-            {
-                Instance = null;
-            }
+            if (Instance == this) Instance = null;
         }
 
     }

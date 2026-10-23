@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-
 using UnityEngine.Assertions;
 
 namespace GameTools.UISystem
@@ -15,8 +14,6 @@ namespace GameTools.UISystem
         }
         private List<RuntimeScreen> screenList = new();
         public override int count => screenList.Count;
-        
-       
         private RuntimeScreen GetRuntimeScreen(ScreenBase screen) => screenList.Find(item => item.screen == screen);
         private bool Contains(ScreenBase screen) => screenList.Exists(item => item.screen == screen);
         private int IndexOf(ScreenBase screen) => screenList.FindIndex(item => item.screen == screen);
@@ -49,14 +46,29 @@ namespace GameTools.UISystem
             }
         }
 
-        public TScreen Open<TScreen>(float fadeTime = -1, string animKey = null, bool addAbove = true, ScreenBase relative = null) where TScreen : Screen
+        public TScreen Open<TScreen>(float fadeTime = -1, string animKey = null, bool addAbove = true, ScreenBase relative = null) where TScreen : UGUIScreen
         {
             return OpenBase<TScreen>(screen => screen.SetOpen(fadeTime, this, animKey), addAbove, relative);
         }
 
-        public TScreen Open<TScreen, TParam>(TParam param, float fadeTime = -1, string animKey = null, bool addAbove = true, ScreenBase relative = null) where TScreen : Screen<TParam>
+        public TScreen Open<TScreen, TParam>(TParam param, float fadeTime = -1, string animKey = null, bool addAbove = true, ScreenBase relative = null) where TScreen : UGUIScreen<TParam>
         {
             return OpenBase<TScreen>(screen => screen.SetOpen(param, fadeTime, this, animKey), addAbove, relative);
+        }
+        
+        public void Close(ScreenBase screen, float fadeTime = -1f, string animKey = null)
+        {
+            using (reentrancyGuard.Enter())
+            {
+                RuntimeScreen runtimeScreen = GetRuntimeScreen(screen);
+                if (runtimeScreen == null) throw new ArgumentException($"{screen} is not include in this Group");
+                screen.SetClose(fadeTime, animKey, callback: () =>
+                {
+                    screenList.Remove(runtimeScreen);
+                    screenLoader.ReleaseScreen(screen);
+                    LayerManager.UpdateInteractable();
+                });
+            }
         }
 
         public void Pause(ScreenBase screen, float fadeTime = -1, string animKey = null)
@@ -88,27 +100,11 @@ namespace GameTools.UISystem
             }
         }
 
-        public void Close(ScreenBase screen, float fadeTime = -1f, string animKey = null)
-        {
-            using (reentrancyGuard.Enter())
-            {
-                RuntimeScreen runtimeScreen = GetRuntimeScreen(screen);
-                if (runtimeScreen == null) throw new ArgumentException($"{screen} is not include in this Group");
-                screen.SetClose(fadeTime, animKey, callback: () =>
-                {
-                    screenList.Remove(runtimeScreen);
-                    screenLoader.ReleaseScreen(screen);
-                    LayerManager.UpdateInteractable();
-                });
-            }
-        }
-
         public void ChangeOrder(ScreenBase target, bool addAbove = true, ScreenBase relative = null)
         {
             using (reentrancyGuard.Enter())
             {
                 if (target == relative) throw new ArgumentException($"target: {target} is same as relative: {relative}");
-
                 if (target == null) throw new ArgumentNullException(nameof(target));
                 if (target.state == ScreenState.Close) throw new Exception($"{target} is already close, cannot change order");
 
@@ -140,7 +136,6 @@ namespace GameTools.UISystem
         {
             using (LayerManager.GetDelayScope())
             {
-                Assert.IsTrue(state == ContainerState.Inactive);
                 if(screenList.Count == 0) return;
                 for (int i = screenList.Count - 1; i >= 0; i--)
                 {
@@ -150,9 +145,9 @@ namespace GameTools.UISystem
                 }
             }
         }
+        
         private protected override void OnActive()
         {
-            Assert.IsFalse(state == ContainerState.Inactive);
             if(screenList.Count == 0) return;
             for (int i = screenList.Count - 1; i >= 0; i--)
             {
@@ -244,7 +239,5 @@ namespace GameTools.UISystem
                 screen.UpdateOrder(ref order);
             }
         }
-
-      
     }
 }

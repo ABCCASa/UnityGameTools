@@ -6,17 +6,17 @@ namespace GameTools.FiniteStateMachine
 {
     public class ConditionTransition<StateKey>
     {
-       private int conditionTimeStamp = 0;
+       private int conditionTimeStamp;
         private readonly SortedList<(int priority, int timeStamp), (Func<bool> condition, StateKey to, bool allowToSelf, bool force)> conditionTransitions =
             new(Comparer<(int priority, int timeStamp)>.Create((x, y) =>
             {
                 int cmp = y.priority.CompareTo(x.priority); // priority 降序
                 if (cmp != 0) return cmp;
-                return x.timeStamp.CompareTo(y.timeStamp);  // timeStamp 升序
+                return x.timeStamp.CompareTo(y.timeStamp);  // timeStamp 升序 (先放的优先级更高)
             }));
         public void Add(StateKey targetKey, Func<bool> condition, int priority=0, bool allowToSelf=true, bool force=false)
         {
-            if (condition == null && force) { Debug.LogWarning("添加的转换没有条件并且是强制转换"); }
+            if (condition == null && force) Debug.LogWarning("添加的转换没有条件并且是强制转换");
             conditionTimeStamp++;
             conditionTransitions[(priority, conditionTimeStamp)] = (condition, targetKey, allowToSelf, force);
         }
@@ -41,7 +41,7 @@ namespace GameTools.FiniteStateMachine
         private readonly Dictionary<EventName, (StateKey to, bool allowToSelf, bool force)> eventTransitions = new();
         public void Add(StateKey to, EventName eventName, bool allowToSelf=true, bool force = false)
         {
-            if (eventTransitions.ContainsKey(eventName)) { throw new Exception($"{eventName} 已经被添加，无法重复添加"); }
+            if (eventTransitions.ContainsKey(eventName)) throw new Exception($"{eventName} 已经被添加，无法重复添加");
             eventTransitions[eventName] = (to, allowToSelf, force);
         }
         public bool Check(ref StateKey state, bool canExit, EventName eventName)
@@ -53,6 +53,7 @@ namespace GameTools.FiniteStateMachine
             return true;
         }
     }
+    
     public class Transition<StateKey, EventName>
     {
         public readonly ConditionTransition<StateKey> conditionTransitions = new();

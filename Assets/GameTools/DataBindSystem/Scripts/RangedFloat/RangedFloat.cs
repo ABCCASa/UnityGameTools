@@ -48,7 +48,7 @@ namespace GameTools.DataBindSystem
         public override bool Equals(object obj) => obj is RangedFloat other && Equals(other);
         public static bool operator ==(RangedFloat left, RangedFloat right) => left.Equals(right);
         public static bool operator !=(RangedFloat left, RangedFloat right) => !left.Equals(right);
-        public override readonly int GetHashCode() =>HashCode.Combine(min, max, _value);
+        public readonly override int GetHashCode() =>HashCode.Combine(min, max, _value);
         public static bool operator <(RangedFloat left, RangedFloat right) => left._value < right._value;
         public static bool operator >(RangedFloat left, RangedFloat right) => left._value > right._value;
         public static bool operator <=(RangedFloat left, RangedFloat right) => left._value <= right._value;

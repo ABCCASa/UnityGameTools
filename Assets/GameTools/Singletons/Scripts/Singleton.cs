@@ -7,7 +7,7 @@ namespace GameTools.Singletons
         {
             get
             {
-                _instance ??= new T();
+                if (_instance == null) _instance = new T();
                 return _instance;
             }
         }

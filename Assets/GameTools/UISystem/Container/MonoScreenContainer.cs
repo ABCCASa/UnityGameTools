@@ -18,7 +18,7 @@ namespace GameTools.UISystem
             }
         }
         
-        public void Initialize()
+        private void Initialize()
         {
             if(isInitialized) return;
             isInitialized = true;
