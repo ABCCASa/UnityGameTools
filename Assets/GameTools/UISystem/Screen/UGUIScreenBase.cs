@@ -8,7 +8,7 @@ using UnityEngine.UI;
 
 namespace GameTools.UISystem
 {
-    public abstract class UGUIScreenBase: ScreenBase
+    public abstract class UGUIScreenBase : ScreenBase
     {
         [SerializeField] private Canvas canvas;
         [SerializeField] private CanvasGroup canvasGroup;
@@ -18,30 +18,25 @@ namespace GameTools.UISystem
             get => canvasGroup.alpha;
             set => canvasGroup.alpha = value;
         }
-        
-        private  protected sealed override void SetInteractable(bool value)
+
+        private protected sealed override void SetInteractable(bool value) => canvasGroup.interactable = value;
+        private protected override void SetOrder(int order) => canvas.sortingOrder = order;
+
+        #region 绑定系统
+
+        private protected override void OnBeforeDispose()
         {
-           canvasGroup.interactable = value;
+            unbindOnClose?.Invoke();
         }
-        private protected override void SetOrder(int order)
+
+        private protected override void OnBeforeInit()
         {
-            canvas.sortingOrder = order;
+            BindInit();
+            bindOnOpen?.Invoke();
         }
-        
-         #region 绑定系统
 
-         private protected override void OnBeforeDispose()
-         {
-           unbindOnClose?.Invoke();
-         }
+        protected virtual bool useAutoBind => true;
 
-         private protected override void OnBeforeInit()
-         {
-             BindInit();
-             bindOnOpen?.Invoke();
-         }
-
-         protected virtual bool useAutoBind { get; } = true;
         protected T Find<T>(string path = null, bool throwOnNotFound = true) where T : Component
         {
             Transform trans = Find(path, throwOnNotFound);
@@ -50,21 +45,21 @@ namespace GameTools.UISystem
             if (throwOnNotFound) throw new Exception($"cannot find the component({typeof(T)}) in path({path})");
             return null;
         }
-        
+
         protected Transform Find(string path = null, bool throwOnNotFound = true)
         {
-            if (string.IsNullOrEmpty(path))return transform;
-            Transform target = transform.Find(path); 
-            if(target != null) return target;
+            if (string.IsNullOrEmpty(path)) return transform;
+            Transform target = transform.Find(path);
+            if (target != null) return target;
             if (throwOnNotFound) throw new Exception($"cannot find the object in path({path})");
             return null;
         }
 
-        
         [AttributeUsage(AttributeTargets.Field | AttributeTargets.Method, AllowMultiple = true)]
         protected sealed class AutoBindAttribute : Attribute
         {
             public readonly string path;
+
             public AutoBindAttribute(string path)
             {
                 this.path = path;
@@ -72,6 +67,7 @@ namespace GameTools.UISystem
         }
 
         private Action bindOnOpen, unbindOnClose;
+
         protected void RegisterBindAction(Action bindAction, Action unbindAction)
         {
             bindOnOpen += bindAction;
@@ -101,8 +97,11 @@ namespace GameTools.UISystem
                         var bind1 = bind;
                         RegisterBindAction(() =>
                             {
-                              var(find, process)  = bind1.Bind(trans.gameObject);
-                              if (find == 0) { throw new Exception($"fail to bind with {path}"); }
+                                var (find, process) = bind1.Bind(trans.gameObject);
+                                if (find == 0)
+                                {
+                                    throw new Exception($"fail to bind with {path}");
+                                }
                             },
                             () => bind.Unbind(trans));
                     }
@@ -157,7 +156,7 @@ namespace GameTools.UISystem
                             RegisterBindAction(
                                 () => inputField.onValueChanged.AddListener(action),
                                 () => inputField.onValueChanged.RemoveListener(action));
-                        } 
+                        }
                         else if (parameter == typeof(int))
                         {
                             TMP_Dropdown dropdown = Find<TMP_Dropdown>(attr.path);
@@ -166,7 +165,10 @@ namespace GameTools.UISystem
                                 () => dropdown.onValueChanged.AddListener(action),
                                 () => dropdown.onValueChanged.RemoveListener(action));
                         }
-                        else { throw new Exception($"Method: {method} 不支持自动绑定"); }
+                        else
+                        {
+                            throw new Exception($"Method: {method} 不支持自动绑定");
+                        }
                     }
                     else // > 1
                     {
@@ -175,8 +177,7 @@ namespace GameTools.UISystem
                 }
             }
         }
+
         #endregion
-        
-        
     }
 }

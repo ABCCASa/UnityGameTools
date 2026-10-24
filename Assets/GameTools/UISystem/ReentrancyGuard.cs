@@ -2,7 +2,7 @@
 using UnityEngine;
 namespace GameTools.UISystem
 {
-    public class ReentrancyGuard
+    internal class ReentrancyGuard
     {
         public bool entered { get; private set; }
         public void CheckNotEntered()

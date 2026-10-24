@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using GameTools.DataBindSystem;
 using Unity.Serialization.Json;
 using UnityEngine;
 

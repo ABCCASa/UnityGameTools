@@ -180,7 +180,7 @@ namespace GameTools.UISystem
 
         protected abstract void OnAnimation(string animKey, float progress);
         private protected abstract void SetInteractable(bool value);
-        private  protected abstract void SetOrder(int order);
+        private protected abstract void SetOrder(int order);
         
         void IContainerItem.UpdateInteractable(ref bool value)
         {

@@ -155,7 +155,6 @@ namespace GameTools.UISystem
             {
                 item.container.UpdateOrder(ref order);
             }
-
             orderDirty = false;
         }
 
@@ -166,7 +165,6 @@ namespace GameTools.UISystem
             {
                 layers[i].container.UpdateInteractable(ref interactable);
             }
-
             interactableDirty = false;
         }
     }
