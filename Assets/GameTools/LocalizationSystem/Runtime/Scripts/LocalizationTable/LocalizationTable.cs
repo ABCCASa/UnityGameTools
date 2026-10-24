@@ -9,8 +9,8 @@ namespace GameTools.LocalizationSystem.Runtime
         #region Runtime
         [SerializeField] internal List<LocalizedKeyValuePair<TValue>> languageData = new();
         [SerializeField] internal List<SystemLanguage> supportedLanguages = new();
-        private Dictionary<string, TValue> runtimePack = null;
-        private SystemLanguage? currentLanguage = null;
+        private Dictionary<string, TValue> runtimeLanguageDict;
+        private SystemLanguage? currentLanguage;
         public TValue this[SystemLanguage language, string key]
         {
             get
@@ -30,12 +30,12 @@ namespace GameTools.LocalizationSystem.Runtime
                 value = default;
                 return false;
             }
-            if (currentLanguage != language || runtimePack == null)
+            if (currentLanguage != language || runtimeLanguageDict == null)
             {
                 currentLanguage = language;
-                runtimePack = GetLocalizationDictionary(language);
+                runtimeLanguageDict = GetLocalizationDictionary(language);
             }
-            if (runtimePack.TryGetValue(key, out value)) return true;
+            if (runtimeLanguageDict.TryGetValue(key, out value)) return true;
             Debug.LogWarning($"[{name}: {language}] Key not found: {key}",this);
             return false;
         }
@@ -44,7 +44,7 @@ namespace GameTools.LocalizationSystem.Runtime
         
         private void OnEnable()
         {
-            runtimePack = null;
+            runtimeLanguageDict = null;
         }
         
         private Dictionary<string, TValue> GetLocalizationDictionary(SystemLanguage language)

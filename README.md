@@ -7,3 +7,4 @@ A collection of reusable tools and utilities for everyday Unity development. The
 The documentation for the following modules has been completed:
 
 - [UISystem](Assets/GameTools/UISystem)
+- [GameTask](Assets/GameTools/GameTask)
