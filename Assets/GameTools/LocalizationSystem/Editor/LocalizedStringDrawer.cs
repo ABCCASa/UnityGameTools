@@ -120,7 +120,7 @@ namespace GameTools.LocalizationSystem.Editor
                 property.serializedObject.Update();
                 var table = tableProperty.objectReferenceValue as StringLocalizationTable;
                 if (table!= null) 
-                { StringLocalizationTableEditorWindow.Open(table); }
+                { StringLocalizationTableWindow.Open<StringLocalizationTableWindow>(table); }
             }) {  text = "Open" };
             basicContainer.Add(tableField);
             basicContainer.Add(openTableBtn);

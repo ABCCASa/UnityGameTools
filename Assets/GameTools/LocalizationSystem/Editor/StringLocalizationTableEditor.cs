@@ -13,7 +13,8 @@ namespace GameTools.LocalizationSystem.Editor
         public override VisualElement CreateInspectorGUI()
         {
             var root = new VisualElement();
-            var button = new Button(() => StringLocalizationTableEditorWindow.Open((StringLocalizationTable)target))
+            StringLocalizationTable table = (StringLocalizationTable)target;
+            var button = new Button(() => StringLocalizationTableWindow.Open<StringLocalizationTableWindow>(table))
             {
                 text = "Open in Window"
             };

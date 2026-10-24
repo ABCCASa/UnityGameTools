@@ -4,7 +4,7 @@ using UnityEngine;
 namespace GameTools.LocalizationSystem.Runtime
 {
 
-    public abstract class LocalizationTableBase<TValue> : ScriptableObject
+    public abstract class LocalizationTable<TValue> : ScriptableObject
     {
         #region Runtime
         [SerializeField] internal List<LocalizedKeyValuePair<TValue>> languageData = new();

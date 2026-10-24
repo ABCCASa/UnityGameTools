@@ -1,19 +1,20 @@
-
-using System;
+﻿using System;
 using GameTools.LocalizationSystem.Runtime;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace GameTools.LocalizationSystem.Editor
 {
-    public class StringLocalizationTableEditorWindow : EditorWindow
+    public abstract class LocalizationTableWindow<TValue> : EditorWindow
     {
-       private StringLocalizationTable target;
+        protected LocalizationTable<TValue> target;
         private MultiColumnListView table;
-        public static void Open(StringLocalizationTable target)
+
+        public static void Open<TWindow>(LocalizationTable<TValue> target) where TWindow : LocalizationTableWindow<TValue>
         {
-            StringLocalizationTableEditorWindow wnd = GetWindow<StringLocalizationTableEditorWindow>();
+            var wnd = GetWindow<TWindow>();
             wnd.target = target;
             target.ValidateData();
             wnd.SetTargetDirty();
@@ -21,7 +22,8 @@ namespace GameTools.LocalizationSystem.Editor
             wnd.Init();
         }
 
-        private static void SetBorder(VisualElement element,bool warning, int width)
+
+        protected static void SetBorder(VisualElement element, bool warning, int width)
         {
             element.style.borderLeftWidth = width;
             element.style.borderRightWidth = width;
@@ -42,7 +44,7 @@ namespace GameTools.LocalizationSystem.Editor
                 element.style.borderLeftColor = StyleKeyword.Null;
             }
         }
-        private static void SetMargin(VisualElement element, int width)
+        protected static void SetMargin(VisualElement element, int width)
         {
             element.style.marginBottom = width;
             element.style.marginTop = width;
@@ -50,17 +52,17 @@ namespace GameTools.LocalizationSystem.Editor
             element.style.marginRight = width;
         }
 
-       private void SetTargetDirty()
+        protected void SetTargetDirty()
         {
-            if (target != null)EditorUtility.SetDirty(target);
+            if (target != null) EditorUtility.SetDirty(target);
             else rootVisualElement.Clear();
         }
-       
+
         public void Init()
         {
             var root = rootVisualElement;
             root.Clear();
-            if (target == null)return;
+            if (target == null) return;
             table = new MultiColumnListView
             {
                 itemsSource = target.languageData,
@@ -70,7 +72,7 @@ namespace GameTools.LocalizationSystem.Editor
                 showAddRemoveFooter = true,
                 selectionType = SelectionType.Multiple,
                 sortingEnabled = true,
-                style = { flexShrink = 1, marginRight = 5, marginLeft = 5},
+                style = { flexShrink = 1, marginRight = 5, marginLeft = 5 },
                 reorderable = true,
                 columns = { reorderable = false }
             };
@@ -84,11 +86,13 @@ namespace GameTools.LocalizationSystem.Editor
                     {
                         return index == 0 ? "new_text_key" : $"new_text_key_{index}";
                     }
+
                     while (target.languageData.Exists(x => x != null && x.textKey == GetText()))
                     {
                         index++;
                     }
-                    target.languageData[i] = new LocalizedKeyValuePair<string>(GetText());
+
+                    target.languageData[i] = new LocalizedKeyValuePair<TValue>(GetText());
                     SetTargetDirty();
                     table.RefreshItems();
                 }
@@ -140,7 +144,7 @@ namespace GameTools.LocalizationSystem.Editor
                 optional = false,
                 sortable = true
             };
-            
+
             table.columnSortingChanged += () =>
             {
                 foreach (var item in table.sortedColumns)
@@ -162,19 +166,19 @@ namespace GameTools.LocalizationSystem.Editor
             {
                 var row = new VisualElement
                 {
-                    style = {  flexDirection = FlexDirection.Row,  flexGrow = 1 }
+                    style = { flexDirection = FlexDirection.Row, flexGrow = 1 }
                 };
 
                 var handle = new Label("≡")
                 {
-                    style =  {  width = 24,  unityTextAlign = TextAnchor.MiddleCenter, opacity = 0.6f },
+                    style = { width = 24, unityTextAlign = TextAnchor.MiddleCenter, opacity = 0.6f },
                     focusable = false
                 };
                 handle.AddManipulator(new ContextualMenuManipulator(evt =>
                 {
                     evt.menu.AppendAction("Delete", _ =>
                     {
-                        target.languageData.Remove((LocalizedKeyValuePair<string>)row.userData);
+                        target.languageData.Remove((LocalizedKeyValuePair<TValue>)row.userData);
                         SetTargetDirty();
                         table.RefreshItems();
                     });
@@ -188,7 +192,7 @@ namespace GameTools.LocalizationSystem.Editor
                 SetMargin(tf, 3);
                 tf.RegisterValueChangedCallback(value =>
                 {
-                    var bindData = (LocalizedKeyValuePair<string>)row.userData;
+                    var bindData = (LocalizedKeyValuePair<TValue>)row.userData;
                     var newValue = value.newValue.Trim();
                     if (newValue != bindData.textKey && !string.IsNullOrWhiteSpace(newValue) && !target.languageData.Exists(d => d.textKey == newValue))
                     {
@@ -201,7 +205,6 @@ namespace GameTools.LocalizationSystem.Editor
                         tf.SetValueWithoutNotify(bindData.textKey);
                     }
                 });
-
                 row.Add(handle);
                 row.Add(tf);
                 return row;
@@ -210,7 +213,7 @@ namespace GameTools.LocalizationSystem.Editor
             keyColumn.bindCell = (element, i) =>
             {
                 TextField tf = (TextField)element[1];
-                LocalizedKeyValuePair<string> bindData = target.languageData[i];
+                LocalizedKeyValuePair<TValue> bindData = target.languageData[i];
                 tf.SetValueWithoutNotify(bindData.textKey);
                 element.userData = bindData;
             };
@@ -219,6 +222,7 @@ namespace GameTools.LocalizationSystem.Editor
             #endregion
 
             #region languageColumn
+
             void AddLanguageColumn(SystemLanguage language)
             {
                 var column = new Column
@@ -227,41 +231,8 @@ namespace GameTools.LocalizationSystem.Editor
                     resizable = true,
                     title = language.ToString(),
                     sortable = false,
-                    makeCell = () =>
-                    {
-                        var tf = new TextField
-                        {
-                            multiline = true,
-                            isDelayed = true,
-                            style = { fontSize = 10, flexGrow = 1, whiteSpace = WhiteSpace.Normal, minHeight = 30 }
-                        };
-                        SetMargin(tf, 3);
-                        tf.RegisterValueChangedCallback(value =>
-                        {
-                           var row = ( LocalizedKeyValuePair<string>)tf.userData;
-                           row.SetValue(language, value.newValue);
-                    
-                            SetTargetDirty();
-                            SetBorder(tf, false, 0);
-                        });
-                        return tf;
-                    },
-                    bindCell = (element, i) =>
-                    {
-                        TextField tf = (TextField)element;
-                        var translations = target.languageData[i];
-                        element.userData = translations;
-                        if (translations.TryGetValue(language, out var value))
-                        {
-                            tf.SetValueWithoutNotify(value);
-                            SetBorder(tf, false, 0);  
-                        }
-                        else
-                        {
-                            tf.SetValueWithoutNotify("");
-                            SetBorder(tf, true, 1);  
-                        }
-                    }
+                    makeCell = () => MakeValueCell(language),
+                    bindCell = (element, i) => BindValueCell(language, element, i)
                 };
                 table.columns.Add(column);
             }
@@ -270,16 +241,22 @@ namespace GameTools.LocalizationSystem.Editor
             {
                 AddLanguageColumn(language);
             }
+
             #endregion languageColumn
 
             #region search
-            var searchRow = new VisualElement { style =  { marginBottom = 10,  marginTop = 10, flexDirection = FlexDirection.Row } };
-            var searchField = new TextField { style ={ flexGrow = 1 }};
+
+            var searchRow = new VisualElement { style = { marginBottom = 10, marginTop = 10, flexDirection = FlexDirection.Row } };
+            var searchField = new TextField { style = { flexGrow = 1 } };
             searchRow.Add(searchField);
             var searchButton = new Button(() =>
             {
                 var prompt = searchField.value;
-                if (string.IsNullOrEmpty(prompt)) {  return; }
+                if (string.IsNullOrEmpty(prompt))
+                {
+                    return;
+                }
+
                 int index = table.selectedIndex;
                 if (target.TryFindNextMatch(prompt, ref index))
                 {
@@ -296,17 +273,23 @@ namespace GameTools.LocalizationSystem.Editor
                 style = { height = 20 }
             };
             searchRow.Add(searchButton);
+
             #endregion
 
             root.Add(searchRow);
             root.Add(table);
         }
 
+
+        protected abstract VisualElement MakeValueCell(SystemLanguage language);
+        protected abstract void BindValueCell(SystemLanguage language, VisualElement element, int i);
+       
+
         private void OnFocus()
         {
             if (target != null)
-            { 
-                table.RefreshItems(); 
+            {
+                table.RefreshItems();
             }
         }
     }
