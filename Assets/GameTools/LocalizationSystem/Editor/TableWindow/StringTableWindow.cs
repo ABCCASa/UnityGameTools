@@ -7,7 +7,7 @@ using UnityEngine.UIElements;
 
 namespace GameTools.LocalizationSystem.Editor
 {
-    public class StringLocalizationTableWindow : LocalizationTableWindow<string>
+    public class StringTableWindow : LocalizationTableWindow<string>
     {
         protected override VisualElement MakeValueCell(SystemLanguage language)
         {

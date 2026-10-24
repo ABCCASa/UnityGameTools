@@ -22,7 +22,6 @@ namespace GameTools.LocalizationSystem.Editor
             wnd.Init();
         }
 
-
         protected static void SetBorder(VisualElement element, bool warning, int width)
         {
             element.style.borderLeftWidth = width;

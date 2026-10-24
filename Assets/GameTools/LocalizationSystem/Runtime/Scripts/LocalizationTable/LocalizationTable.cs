@@ -16,7 +16,7 @@ namespace GameTools.LocalizationSystem.Runtime
             get
             {
                 if (TryGetValue(language, key, out TValue value)) return value;
-                return ValuesOnNotFound(language, key);
+                return ValuesForNotFound(language, key);
             }
         }
 
@@ -36,11 +36,11 @@ namespace GameTools.LocalizationSystem.Runtime
                 runtimePack = GetLocalizationDictionary(language);
             }
             if (runtimePack.TryGetValue(key, out value)) return true;
-            Debug.LogWarning($"[{name}: {language}] Key not found: {key}");
+            Debug.LogWarning($"[{name}: {language}] Key not found: {key}",this);
             return false;
         }
 
-        protected abstract TValue ValuesOnNotFound(SystemLanguage language, string key);
+        protected abstract TValue ValuesForNotFound(SystemLanguage language, string key);
         
         private void OnEnable()
         {

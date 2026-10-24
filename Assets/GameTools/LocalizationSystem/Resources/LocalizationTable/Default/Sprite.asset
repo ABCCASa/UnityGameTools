@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f455312ee0c4849a04f2b9bb7009eb3, type: 3}
+  m_Name: Sprite
+  m_EditorClassIdentifier: 
+  languageData:
+  - textKey: aaaa
+    translations:
+    - language: 6
+      value: {fileID: 21300000, guid: 8b1b3d0ead9f5614b8beea0f0e03f583, type: 3}
+    - language: 10
+      value: {fileID: 21300000, guid: 8b1b3d0ead9f5614b8beea0f0e03f583, type: 3}
+    - language: 40
+      value: {fileID: 21300000, guid: c6bcfe71c6a102d4d83cd3c2c72a0d9a, type: 3}
+  supportedLanguages: 0a00000028000000

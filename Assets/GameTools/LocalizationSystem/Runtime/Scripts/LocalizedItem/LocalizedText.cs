@@ -9,7 +9,7 @@ namespace GameTools.LocalizationSystem
     public class LocalizedText: MonoBehaviour, ILocalizedItem
     {
         [SerializeField] private TMP_Text text;
-        [SerializeField] private LocalizedString localizedString;
+        [SerializeField] private LocalizedData<string> localizedString;
         public void OnLanguageUpdate(SystemLanguage language)
         {
             if (text == null)

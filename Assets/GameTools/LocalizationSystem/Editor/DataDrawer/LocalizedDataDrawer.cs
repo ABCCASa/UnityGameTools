@@ -7,8 +7,8 @@ using UnityEditor.UIElements;
 namespace GameTools.LocalizationSystem.Editor
 {
     
-    [CustomPropertyDrawer(typeof(LocalizedString))]
-    public class LocalizedStringDrawer : PropertyDrawer
+   
+    public abstract class LocalizedDataDrawer<TValue, TTable> : PropertyDrawer where TTable : LocalizationTable<TValue>
     {
         private bool isFold = true;
         private VisualElement detailContainer;
@@ -27,14 +27,14 @@ namespace GameTools.LocalizationSystem.Editor
 
             tableField = new ObjectField("")
             {
-                objectType = typeof(StringLocalizationTable),
+                objectType = typeof(TTable),
                 bindingPath = tableProperty.propertyPath,
                 style = { flexGrow = 0, flexShrink = 2 },
             };
 
             tableField.RegisterValueChangedCallback(value =>
             {
-                var table = value.newValue as StringLocalizationTable;
+                var table = value.newValue as LocalizationTable<TValue>;
                 var key = keyProperty.stringValue;
                 OnValueChange(table, key);
             });
@@ -56,14 +56,14 @@ namespace GameTools.LocalizationSystem.Editor
                     keyProperty.stringValue = newValue;
                     property.serializedObject.ApplyModifiedProperties();
                 }
-                OnValueChange(tableProperty.objectReferenceValue as StringLocalizationTable, newValue);
+                OnValueChange(tableProperty.objectReferenceValue as LocalizationTable<TValue>, newValue);
             });
             
             keyField.RegisterCallback<ContextualMenuPopulateEvent>(evt =>
             {
                 evt.menu.AppendSeparator();
                 property.serializedObject.Update();
-                var t = tableProperty.objectReferenceValue as StringLocalizationTable;
+                var t = tableProperty.objectReferenceValue as LocalizationTable<TValue>;
                 if (t == null)
                     return;
 
@@ -111,16 +111,16 @@ namespace GameTools.LocalizationSystem.Editor
                 else
                 {
                     foldButton.text = "▾";
-                    UpdateDetail(tableProperty.objectReferenceValue as StringLocalizationTable, keyProperty.stringValue);
+                    UpdateDetail(tableProperty.objectReferenceValue as LocalizationTable<TValue>, keyProperty.stringValue);
                 }
             };
             
             Button openTableBtn = new Button(() =>
             {  
                 property.serializedObject.Update();
-                var table = tableProperty.objectReferenceValue as StringLocalizationTable;
-                if (table!= null) 
-                { StringLocalizationTableWindow.Open<StringLocalizationTableWindow>(table); }
+                var table = tableProperty.objectReferenceValue as LocalizationTable<TValue>;
+                if (table != null) OpenTable(table);
+              
             }) {  text = "Open" };
             basicContainer.Add(tableField);
             basicContainer.Add(openTableBtn);
@@ -129,17 +129,19 @@ namespace GameTools.LocalizationSystem.Editor
             root.Add(new Label(property.displayName) { style = { marginLeft = 5 } });
             root.Add(basicContainer);
             root.Add(detailContainer);
-            ValidationTest(tableProperty.objectReferenceValue as StringLocalizationTable, keyProperty.stringValue);
+            ValidationTest(tableProperty.objectReferenceValue as LocalizationTable<TValue>, keyProperty.stringValue);
             return root;
         }
 
-        private void OnValueChange(StringLocalizationTable table, string key)
+        protected abstract void OpenTable(LocalizationTable<TValue> table);
+
+        private void OnValueChange(LocalizationTable<TValue> table, string key)
         { 
             ValidationTest(table, key);
             if (!isFold) UpdateDetail(table, key);
         }
-
-        private void ValidationTest(StringLocalizationTable table, string key)
+    
+        private void ValidationTest(LocalizationTable<TValue> table, string key)
         { 
             bool tableError = table == null;
             bool keyError = tableError || string.IsNullOrWhiteSpace(key) || !table.languageData.Exists(x => x.textKey == key);
@@ -147,17 +149,17 @@ namespace GameTools.LocalizationSystem.Editor
             SetBorder(keyField[0], keyError, 1);
         }
         
-        private void AddKeyToTable(StringLocalizationTable table, string key)
+        private void AddKeyToTable(LocalizationTable<TValue> table, string key)
         {
             if (table !=null && !table.languageData.Exists(t => t.textKey == key))
             {
-                table.languageData.Add(new LocalizedKeyValuePair<string>(key));
+                table.languageData.Add(new LocalizedKeyValuePair<TValue>(key));
                 EditorUtility.SetDirty(table);
             }
             OnValueChange(table, key); 
         }
         
-        private void UpdateDetail(StringLocalizationTable table, string key)
+        private void UpdateDetail(LocalizationTable<TValue> table, string key)
         {
             detailContainer.Clear();
             if (table == null || string.IsNullOrWhiteSpace(key)) { return; }
@@ -169,32 +171,13 @@ namespace GameTools.LocalizationSystem.Editor
             }
             foreach (var l in table.supportedLanguages)
             {
-                var tf = new TextField(l.ToString(), -1, true, false, '*')
-                {
-                    isDelayed = true
-                };
-          
-                if (row.TryGetValue(l, out string value))
-                {
-                    tf.SetValueWithoutNotify(value);
-                    SetBorder(tf[1], false, 1);
-                }
-                else
-                {
-                    tf.SetValueWithoutNotify("");
-                    SetBorder(tf[1], true, 1);
-                }
-
-                detailContainer.Add(tf);
-                tf.RegisterValueChangedCallback((v) =>
-                {
-                    row.SetValue(l, v.newValue);
-                    EditorUtility.SetDirty(table);
-                    SetBorder(tf[1], false, 1);
-                });
+                detailContainer.Add(DisplayValue(table, row, l));
             }
         }
 
+
+        private protected abstract VisualElement DisplayValue(LocalizationTable<TValue> table, LocalizedKeyValuePair<TValue> row, SystemLanguage language);
+       
         private static void InitProperty(SerializedProperty property)
         { 
             property.serializedObject.Update();
@@ -205,13 +188,14 @@ namespace GameTools.LocalizationSystem.Editor
             isInitProperty.boolValue = true;
             if (tableProperty.objectReferenceValue ==null)
             {
-                var defaultTable = Resources.Load<StringLocalizationTable>("LocalizationTable/Default");
+                var defaultTable = Resources.Load<LocalizationTable<TValue>>($"LocalizationTable/Default/{typeof(TValue).Name}");
+                Debug.Log(defaultTable);
                 if (defaultTable != null) tableProperty.objectReferenceValue = defaultTable;
             }
             property.serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static void SetBorder(VisualElement element, bool warning, int width)
+        protected static void SetBorder(VisualElement element, bool warning, int width)
         {
             element.style.borderLeftWidth = width;
             element.style.borderRightWidth = width;

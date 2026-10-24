@@ -7,14 +7,13 @@ using GameTools.LocalizationSystem.Runtime;
 
 namespace GameTools.LocalizationSystem.Editor
 {
-    [CustomEditor(typeof(StringLocalizationTable))]
-    public class StringLocalizationTableEditor : UnityEditor.Editor
+    public class TableEditor<TValue, TWindow> : UnityEditor.Editor where TWindow: LocalizationTableWindow<TValue>
     {
         public override VisualElement CreateInspectorGUI()
         {
             var root = new VisualElement();
-            StringLocalizationTable table = (StringLocalizationTable)target;
-            var button = new Button(() => StringLocalizationTableWindow.Open<StringLocalizationTableWindow>(table))
+            var table = (LocalizationTable<TValue>)target;
+            var button = new Button(() => LocalizationTableWindow<TValue>.Open<TWindow>(table))
             {
                 text = "Open in Window"
             };

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace GameTools.LocalizationSystem.Runtime
 {
     [Serializable]
-    public struct LocalizedData<TValue>
+    public class LocalizedData<TValue>
     {
         #pragma warning disable CS0414
         [SerializeField, HideInInspector] private bool isInit; //判断是否初始化，在editor下使用，如果否则会使用默认的table赋值
