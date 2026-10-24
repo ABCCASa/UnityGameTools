@@ -73,5 +73,4 @@ Operations start when called, so their waits can overlap. If any task fails, `Wh
 - **Do not await the same task instance more than once**, even after it has completed. Do not share it between awaiters.
 - **Do not leave a task unawaited or discard it for fire-and-forget use.** It still runs, but after completion it is not returned to the pool, and its exceptions are not automatically reported.
 - Pass distinct tasks to `WhenAll`; do not await its inputs separately. Await the task returned by `WhenAll` as well.
-- The callback awaitables (`UpdateAsync`, `FixedUpdateAsync`, and `LateUpdateAsync`) can be used repeatedly by multiple operations.
 - There is no built-in cancellation. Destroying or disabling a GameObject does not stop pending work; check that scene objects are still valid after awaits before accessing them.
