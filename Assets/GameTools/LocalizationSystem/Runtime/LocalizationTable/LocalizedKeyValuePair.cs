@@ -37,7 +37,6 @@ namespace GameTools.LocalizationSystem.Runtime
         public virtual bool MatchSearchPrompt(string prompt, List<SystemLanguage> existLanguages)
         {
             if (textKey.Contains(prompt)) return true;
-           
             return false;
         }
 

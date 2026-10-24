@@ -30,7 +30,6 @@ namespace GameTools.LocalizationSystem.Runtime
                 value = default;
                 return false;
             }
-            
             if (currentLanguage != language || runtimePack == null)
             {
                 currentLanguage = language;

@@ -66,21 +66,30 @@ namespace GameTools.LocalizationSystem.Editor
                 var t = tableProperty.objectReferenceValue as StringLocalizationTable;
                 if (t == null)
                     return;
-                foreach (var kv in t.languageData)
+
+                if (t.languageData.Count == 0)
                 {
-                    evt.menu.AppendAction($"Paths/{kv.textKey.Replace('.', '/')}", _ =>
+                    evt.menu.AppendAction($"Paths", null, DropdownMenuAction.Status.Disabled);
+                    evt.menu.AppendAction($"Keys", null, DropdownMenuAction.Status.Disabled);
+                }
+                else
+                {
+                    foreach (var kv in t.languageData)
                     {
-                        property.serializedObject.Update();
-                        keyProperty.stringValue = kv.textKey;
-                        property.serializedObject.ApplyModifiedProperties();
-                    });
+                        evt.menu.AppendAction($"Paths/{kv.textKey.Replace('.', '/')}", _ =>
+                        {
+                            property.serializedObject.Update();
+                            keyProperty.stringValue = kv.textKey;
+                            property.serializedObject.ApplyModifiedProperties();
+                        });
                     
-                    evt.menu.AppendAction($"Keys/{kv.textKey}", _ =>
-                    {
-                        property.serializedObject.Update();
-                        keyProperty.stringValue = kv.textKey;
-                        property.serializedObject.ApplyModifiedPropertiesWithoutUndo();
-                    });
+                        evt.menu.AppendAction($"Keys/{kv.textKey}", _ =>
+                        {
+                            property.serializedObject.Update();
+                            keyProperty.stringValue = kv.textKey;
+                            property.serializedObject.ApplyModifiedPropertiesWithoutUndo();
+                        });
+                    }
                 }
             });
             

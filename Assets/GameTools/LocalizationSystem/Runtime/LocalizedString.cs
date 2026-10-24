@@ -16,14 +16,8 @@ namespace GameTools.LocalizationSystem.Runtime
         public LocalizedString(StringLocalizationTable table, string key)
         {
             isInit = true;
-            if (table == null)
-            {
-                throw new ArgumentNullException(nameof(table));
-            }
-            if(string.IsNullOrEmpty(key)) 
-            {
-                throw new ArgumentNullException(nameof(key));
-            }
+            if (table == null) throw new ArgumentNullException(nameof(table));
+            if(string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
             this.table = table;
             this.key = key;
         }
