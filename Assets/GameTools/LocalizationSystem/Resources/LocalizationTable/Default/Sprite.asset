@@ -12,13 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f455312ee0c4849a04f2b9bb7009eb3, type: 3}
   m_Name: Sprite
   m_EditorClassIdentifier: 
-  languageData:
-  - textKey: aaaa
-    translations:
-    - language: 6
-      value: {fileID: 21300000, guid: 8b1b3d0ead9f5614b8beea0f0e03f583, type: 3}
-    - language: 10
-      value: {fileID: 21300000, guid: 8b1b3d0ead9f5614b8beea0f0e03f583, type: 3}
-    - language: 40
-      value: {fileID: 21300000, guid: c6bcfe71c6a102d4d83cd3c2c72a0d9a, type: 3}
+  languageData: []
   supportedLanguages: 0a00000028000000
