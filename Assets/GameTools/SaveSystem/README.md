@@ -184,8 +184,7 @@ Once `DataContainer` has been initialized, it also calls `SaveAll()` when the ap
 ## Password-protected containers
 
 ```csharp
-DataContainer profile = DataContainer.Get(
-    "profiles/protected.sav", password: "example-password");
+DataContainer profile = DataContainer.Get("profiles/protected.sav", password: "example-password");
 
 profile.Set("coins", 120);
 profile.Save();

@@ -58,7 +58,6 @@ namespace GameTools.SaveSystem
 
     public partial class DataContainer
     {
-        private Dictionary<(Type, string), object> createdBindableSource = new();
         private Dictionary<string, string> _cache;
         private Dictionary<string, string> cache
         {
@@ -97,9 +96,6 @@ namespace GameTools.SaveSystem
             }
             if (releaseCache) _cache = null;
         }
-
-        
-
 
         public T Get<T>(string key, T defaultValue = default)
         {
