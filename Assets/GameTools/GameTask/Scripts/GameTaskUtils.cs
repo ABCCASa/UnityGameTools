@@ -1,16 +1,33 @@
-
 using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
+using UnityEngine;
 
 namespace GameTools.GameTask
 {
     public partial class GameTask
     {
-        public static AsyncLoop UpdateAsync() => GameTaskLoopScheduler.update;
-        public static AsyncLoop FixedUpdateAsync() => GameTaskLoopScheduler.fixedUpdate;
-        public static AsyncLoop LateUpdateAsync() => GameTaskLoopScheduler.lateUpdate;
+        public static PlayerLoopAwaitable NextUpdate() => GameTaskLoopScheduler.update;
+        public static PlayerLoopAwaitable NextFixedUpdate() => GameTaskLoopScheduler.fixedUpdate;
+        public static PlayerLoopAwaitable NextLateUpdate() => GameTaskLoopScheduler.lateUpdate;
+        
+        public static async GameTask Delay(float seconds)
+        {
+            float endTime =  Time.time + seconds;
+            while (Time.time < endTime)
+            {
+                await NextUpdate();
+            }
+        }
+
+        public static async GameTask UnscaledDelay(float seconds)
+        {
+            float endTime =  Time.unscaledTime + seconds;
+            while (Time.unscaledTime < endTime)
+            {
+                await NextUpdate();
+            }
+        }
+
         public static async GameTask WhenAll(params GameTask[] tasks)
         {
             if (tasks == null || tasks.Length == 0) return;
@@ -49,5 +66,4 @@ namespace GameTools.GameTask
             return results;
         }
     }
-
 }
